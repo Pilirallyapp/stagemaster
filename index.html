@@ -1,26 +1,34 @@
 <!DOCTYPE html>
 <html lang="el">
-<head><link rel="icon" type="image/png" href="stagemaster-icon.png">
-<link rel="apple-touch-icon" href="stagemaster-icon.png">
-
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
+<head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>StageMaster by PILI</title>
 
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="stagemaster-icon.png">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
+
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="StageMaster">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; margin: 0; background-color: #1a1a1a; color: white; overflow-x: hidden; padding-top: 10px; }
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start; 
+            min-height: 100vh; 
+            margin: 0; 
+            background-color: #1a1a1a; 
+            color: white; 
+            overflow-x: hidden; 
+            padding-top: env(safe-area-inset-top, 10px); 
+        }
         
-        /* Branding Header */
         .header { margin-bottom: 10px; text-align: center; }
         .header h1 { margin: 0; font-size: 1.8rem; letter-spacing: 2px; color: #00f2ff; text-transform: uppercase; display: inline-block; }
         .header span { font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-left: 5px; vertical-align: middle; }
@@ -30,7 +38,6 @@
         .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
         
-        /* Flash Animation */
         .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
 
         #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #34a853; width: 0%; transition: none; }
@@ -109,22 +116,17 @@
 
     const logStatus = (msg) => { document.getElementById('status-log').innerText = msg; };
 
-    // --- SOUND & VOICE FUNCTIONS ---
     function playResetSound() {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
-
         oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-        oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1); // A6
-        
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
         gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + 0.3);
     }
@@ -212,21 +214,16 @@
         }
     });
 
-    // PARTIAL RESET with sound and flash
     document.getElementById('resetPartialBtn').addEventListener('click', () => {
         partialDist = 0;
         const pVal = document.getElementById('partial');
         const pBox = document.getElementById('partialBox');
-        
         pVal.innerText = "0.00";
         playResetSound();
-
-        // Flash effect
         pBox.classList.add('flash-active');
         setTimeout(() => { pBox.classList.remove('flash-active'); }, 1000);
     });
 
-    // TOTAL RESET with progress bar and voice
     let progressInterval, progressWidth = 0;
     const startPress = (e) => {
         e.preventDefault(); progressWidth = 0;
@@ -237,16 +234,13 @@
                 clearInterval(progressInterval);
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.setItem('savedTotal', 0); localStorage.setItem('savedAccumulatedTime', 0);
-                
                 if (watchId !== null) { sessionStartTime = Date.now(); }
-
                 document.getElementById('total').innerText = "0.00"; 
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00"; 
                 document.getElementById('speed').innerText = "0.0";
                 document.getElementById('progress-bar').style.width = "0%";
-                
-                speakReset(); // Voice Outloud
+                speakReset();
                 logStatus("Total & Timer Reset Successful");
             }
         }, 60);
@@ -256,7 +250,6 @@
     document.getElementById('totalArea').addEventListener('touchstart', startPress);
     window.addEventListener('touchend', cancelPress);
 
-    // Initial Load
     document.getElementById('total').innerText = totalDist.toFixed(2);
     const initialH = Math.floor(accumulatedTime / 3600000);
     const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
