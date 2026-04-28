@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StageMaster by PILI</title>
+
+    <link rel="apple-touch-icon" href="stagemaster-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StageMaster">
+
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; margin: 0; background-color: #1a1a1a; color: white; overflow-x: hidden; padding-top: 10px; }
+        
+        /* Branding Header */
+        .header { margin-bottom: 10px; text-align: center; }
+        .header h1 { margin: 0; font-size: 1.8rem; letter-spacing: 2px; color: #00f2ff; text-transform: uppercase; display: inline-block; }
+        .header span { font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-left: 5px; vertical-align: middle; }
+
+        .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center; width: 94%; max-width: 450px; position: relative; }
+        .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
+        .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; }
+        .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
+        
+        /* Flash Animation */
+        .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
+
+        #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #34a853; width: 0%; transition: none; }
+        .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; margin: 2px 0; }
+        .speed-val { font-size: 5.5rem; color: #fbbc05; line-height: 0.9; }
+        
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .stat-box { background: #3d3d3d; padding: 10px 5px; border-radius: 12px; }
+        .stat-val { font-size: 1.8rem; font-weight: bold; font-family: monospace; line-height: 1.1; }
+        
+        .accuracy-tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; margin-top: 4px; display: inline-block; font-weight: bold; }
+        .acc-good { background: #34a853; color: white; }
+        .acc-bad { background: #ea4335; color: white; }
+        
+        button { padding: 12px; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; text-transform: uppercase; }
+        .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 60px; margin-top: 10px; }
+        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 85px; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
+        #status-log { font-size: 0.6rem; color: #666; margin-top: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>StageMaster</h1><span>by PILI</span>
+</div>
+
+<div class="card">
+    <div class="metric">
+        <div class="label">Current Speed</div>
+        <div id="currSpeed" class="value speed-val">0</div>
+        <div style="font-size: 0.8rem; color: #888;">KM/H</div>
+        <div id="accuracy" class="accuracy-tag acc-bad">GPS: OFFLINE</div>
+    </div>
+
+    <div class="metric total-box" id="totalArea">
+        <div class="label">Total (Hold 3s to Reset)</div>
+        <div id="total" class="value">0.00</div>
+        <div style="font-size: 0.8rem; color: #888;">KM</div>
+        <div id="progress-bar"></div>
+    </div>
+
+    <div id="partialBox" class="metric partial-box">
+        <div class="label">Partial Distance</div>
+        <div id="partial" class="value">0.00</div>
+        <div style="font-size: 0.8rem; color: #888;">KM</div>
+    </div>
+
+    <button id="toggleBtn" class="start-btn">START TRACKING</button>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="label">Time</div>
+            <div id="timer" class="stat-val">00:00:00</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">Avg Speed</div>
+            <div id="speed" class="stat-val">0.0</div>
+            <div style="font-size: 0.6rem; color: #888;">KM/H</div>
+        </div>
+    </div>
+
+    <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
+    <div id="status-log">System Ready</div>
+</div>
+
+<script>
+    let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
+    let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
+    let partialDist = 0;
+    let watchId = null;
+    let lastCoords = null;
+    let timerInterval = null;
+    let sessionStartTime = null;
+    let wakeLock = null;
+
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = msg; };
+
+    // --- SOUND & VOICE FUNCTIONS ---
+    function playResetSound() {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1); // A6
+        
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.3);
+    }
+
+    function speakReset() {
+        const msg = new SpeechSynthesisUtterance("TOTAL KILOMETERS AND TIMER RESET");
+        msg.lang = 'en-US';
+        msg.rate = 1.0;
+        window.speechSynthesis.speak(msg);
+    }
+
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                logStatus("Screen Lock: ACTIVE");
+            } catch (err) { logStatus("WakeLock Error: " + err.message); }
+        }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && watchId !== null) {
+            await requestWakeLock();
+        }
+    });
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; 
+        const dLat = (lat2-lat1) * Math.PI/180;
+        const dLon = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) / 1000; 
+    }
+
+    function updateStats(position) {
+        const { latitude, longitude, accuracy, speed } = position.coords;
+        document.getElementById('accuracy').innerText = `Acc: ${accuracy.toFixed(1)}m`;
+        document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
+        if (speed !== null) document.getElementById('currSpeed').innerText = Math.round(speed * 3.6);
+
+        if (accuracy > 40) return; 
+
+        if (lastCoords) {
+            const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
+            if (distance > 0.0006) { 
+                totalDist += distance;
+                partialDist += distance;
+                localStorage.setItem('savedTotal', totalDist);
+                document.getElementById('total').innerText = totalDist.toFixed(2);
+                document.getElementById('partial').innerText = partialDist.toFixed(2);
+                
+                const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
+                const totalHours = currentElapsed / 3600000;
+                if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
+            }
+        }
+        lastCoords = { latitude, longitude };
+    }
+
+    document.getElementById('toggleBtn').addEventListener('click', async () => {
+        if (watchId === null) {
+            await requestWakeLock();
+            sessionStartTime = Date.now(); 
+            timerInterval = setInterval(() => {
+                const ms = accumulatedTime + (Date.now() - sessionStartTime);
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                const s = Math.floor((ms % 60000) / 1000);
+                document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }, 1000);
+            lastCoords = null;
+            watchId = navigator.geolocation.watchPosition(updateStats, (err) => logStatus("GPS: " + err.message), { enableHighAccuracy: true, maximumAge: 0 });
+            document.getElementById('toggleBtn').innerText = "STOP";
+            document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
+        } else {
+            clearInterval(timerInterval);
+            accumulatedTime += (Date.now() - sessionStartTime);
+            localStorage.setItem('savedAccumulatedTime', accumulatedTime);
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null; lastCoords = null;
+            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+            document.getElementById('toggleBtn').innerText = "RESUME";
+            document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
+            logStatus("Tracking Paused");
+        }
+    });
+
+    // PARTIAL RESET with sound and flash
+    document.getElementById('resetPartialBtn').addEventListener('click', () => {
+        partialDist = 0;
+        const pVal = document.getElementById('partial');
+        const pBox = document.getElementById('partialBox');
+        
+        pVal.innerText = "0.00";
+        playResetSound();
+
+        // Flash effect
+        pBox.classList.add('flash-active');
+        setTimeout(() => { pBox.classList.remove('flash-active'); }, 1000);
+    });
+
+    // TOTAL RESET with progress bar and voice
+    let progressInterval, progressWidth = 0;
+    const startPress = (e) => {
+        e.preventDefault(); progressWidth = 0;
+        progressInterval = setInterval(() => {
+            progressWidth += 2;
+            document.getElementById('progress-bar').style.width = progressWidth + "%";
+            if (progressWidth >= 100) {
+                clearInterval(progressInterval);
+                totalDist = 0; partialDist = 0; accumulatedTime = 0;
+                localStorage.setItem('savedTotal', 0); localStorage.setItem('savedAccumulatedTime', 0);
+                
+                if (watchId !== null) { sessionStartTime = Date.now(); }
+
+                document.getElementById('total').innerText = "0.00"; 
+                document.getElementById('partial').innerText = "0.00";
+                document.getElementById('timer').innerText = "00:00:00"; 
+                document.getElementById('speed').innerText = "0.0";
+                document.getElementById('progress-bar').style.width = "0%";
+                
+                speakReset(); // Voice Outloud
+                logStatus("Total & Timer Reset Successful");
+            }
+        }, 60);
+    };
+    const cancelPress = () => { clearInterval(progressInterval); document.getElementById('progress-bar').style.width = "0%"; };
+
+    document.getElementById('totalArea').addEventListener('touchstart', startPress);
+    window.addEventListener('touchend', cancelPress);
+
+    // Initial Load
+    document.getElementById('total').innerText = totalDist.toFixed(2);
+    const initialH = Math.floor(accumulatedTime / 3600000);
+    const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
+    const initialS = Math.floor((accumulatedTime % 60000) / 1000);
+    document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
+</script>
+</body>
+</html>
