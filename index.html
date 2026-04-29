@@ -8,13 +8,19 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; margin-top: 10px; }
-        .value { font-size: 4rem; font-weight: bold; font-family: monospace; }
+        .value { font-size: 4rem; font-weight: bold; font-family: monospace; transition: all 0.2s; }
         .speed-val { color: #fbbc05; font-size: 5.5rem; }
-        .metric { margin: 10px 0; padding: 10px; background: #3d3d3d; border-radius: 15px; }
+        .metric { margin: 10px 0; padding: 10px; background: #3d3d3d; border-radius: 15px; overflow: hidden; position: relative; }
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button { width: 100%; padding: 20px; border-radius: 15px; font-weight: bold; border: none; margin-top: 10px; font-size: 1.2rem; }
-        .start-btn { background: #34a853; color: white; }
-        .reset-btn { background: #1a73e8; color: white; height: 80px; font-size: 1.5rem; }
+        button { width: 100%; padding: 20px; border-radius: 15px; font-weight: bold; border: none; margin-top: 10px; font-size: 1.2rem; touch-action: manipulation; }
+        .start-btn { background: #34a853; color: white; height: 80px; font-size: 1.5rem; }
+        .reset-partial-btn { background: #ea4335; color: white; margin-bottom: 5px; }
+        
+        /* Progress Bar for Total Reset */
+        #progress-overlay { position: absolute; bottom: 0; left: 0; height: 5px; background: #34a853; width: 0%; transition: width 0.1s linear; }
+        
+        /* Flash effect for Partial Reset */
+        .flash { background-color: #ffffff !important; color: #000000 !important; }
         #status { font-size: 0.7rem; color: #888; margin-top: 15px; border-top: 1px solid #444; padding-top: 5px; }
     </style>
 </head>
@@ -25,14 +31,23 @@
         <div id="currSpeed" class="value speed-val">0</div>
         <div>KM/H</div>
     </div>
-    <div class="metric">
+    
+    <!-- Total KM with Progress Bar -->
+    <div class="metric" id="total-container">
         <div id="total" class="value">0.00</div>
         <div>TOTAL KM</div>
+        <div id="progress-overlay"></div>
     </div>
-    <div class="metric" style="background: #253b5e;">
+
+    <!-- Partial KM with Flash Effect -->
+    <div class="metric" id="partial-container" style="background: #253b5e;">
         <div id="partial" class="value">0.00</div>
         <div>PARTIAL KM</div>
     </div>
+
+    <!-- Reset Partial Button ABOVE stats -->
+    <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
+
     <div class="stats-grid">
         <div class="metric">
             <div id="timer" style="font-size: 1.5rem; font-family: monospace;">00:00:00</div>
@@ -43,8 +58,8 @@
             <div>AVG KM/H</div>
         </div>
     </div>
+
     <button id="toggleBtn" class="start-btn">START</button>
-    <button id="resetPartialBtn" class="reset-btn">RESET PARTIAL</button>
     <div id="status">Ready - Version 2</div>
 </div>
 
@@ -57,6 +72,27 @@
     let lastCoords = null;
     let startTime = null;
     let timerInterval = null;
+    let resetTimer = null;
+
+    const synth = window.speechSynthesis;
+    const beep = new AudioContext();
+
+    function playResetSound() {
+        const osc = beep.createOscillator();
+        const gain = beep.createGain();
+        osc.connect(gain);
+        gain.connect(beep.destination);
+        osc.frequency.value = 880;
+        gain.gain.exponentialRampToValueAtTime(0.0001, beep.currentTime + 0.5);
+        osc.start();
+        osc.stop(beep.currentTime + 0.5);
+    }
+
+    function speak(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        synth.speak(utterance);
+    }
 
     function updateDisplay() {
         document.getElementById('total').innerText = totalDist.toFixed(2);
@@ -80,9 +116,7 @@
     function onLocation(pos) {
         const { latitude, longitude, speed, accuracy } = pos.coords;
         if (accuracy > 30) return; 
-        
         document.getElementById('currSpeed').innerText = Math.round((speed || 0) * 3.6);
-        
         if (isTracking && lastCoords) {
             const d = calculateDistance(lastCoords.lat, lastCoords.lon, latitude, longitude);
             const timeDiff = (Date.now() - lastCoords.time) / 3600000;
@@ -97,6 +131,7 @@
         updateDisplay();
     }
 
+    // TOGGLE START/STOP
     document.getElementById('toggleBtn').onclick = () => {
         isTracking = !isTracking;
         if (isTracking) {
@@ -115,11 +150,49 @@
         }
     };
 
+    // PARTIAL RESET (Flash + Sound)
     document.getElementById('resetPartialBtn').onclick = () => {
         partialDist = 0;
         localStorage.setItem('savedPartial', 0);
+        playResetSound();
+        const container = document.getElementById('partial-container');
+        container.classList.add('flash');
+        setTimeout(() => container.classList.remove('flash'), 200);
         updateDisplay();
     };
+
+    // TOTAL RESET (3-Second Hold + Green Bar + Voice)
+    const totalContainer = document.getElementById('total-container');
+    const progressOverlay = document.getElementById('progress-overlay');
+
+    const startReset = () => {
+        let progress = 0;
+        progressOverlay.style.width = '0%';
+        resetTimer = setInterval(() => {
+            progress += 3.33; // Approx 3 seconds
+            progressOverlay.style.width = progress + '%';
+            if (progress >= 100) {
+                clearInterval(resetTimer);
+                totalDist = 0;
+                partialDist = 0;
+                accumulatedTime = 0;
+                localStorage.clear();
+                updateDisplay();
+                speak("Total kilometers and timer reset");
+                progressOverlay.style.width = '0%';
+            }
+        }, 100);
+    };
+
+    const cancelReset = () => {
+        clearInterval(resetTimer);
+        progressOverlay.style.width = '0%';
+    };
+
+    totalContainer.addEventListener('mousedown', startReset);
+    totalContainer.addEventListener('touchstart', startReset);
+    totalContainer.addEventListener('mouseup', cancelReset);
+    totalContainer.addEventListener('touchend', cancelReset);
 
     updateDisplay();
 </script>
