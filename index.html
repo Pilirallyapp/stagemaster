@@ -80,10 +80,11 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2</div>
+    <div id="status-log">Version 2.1</div>
 </div>
 
 <script>
+    // --- GLOBAL VARIABLES ---
     let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
     let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
@@ -91,9 +92,28 @@
     let lastCoords = null;
     let timerInterval = null;
     let sessionStartTime = null;
-    let wakeLock = null;
+    let wakeLock = null; // Only declared ONCE here
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "Version 2 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.1 | " + msg; };
+
+    // --- WAKE LOCK ENGINE ---
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try { 
+                wakeLock = await navigator.wakeLock.request('screen');
+                logStatus("Screen Awake Active");
+            } catch (err) {
+                logStatus("WakeLock Error");
+            }
+        }
+    }
+
+    // Universal Trigger: Re-activates when returning from ANY other app
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') {
+            await requestWakeLock();
+        }
+    });
 
     function playResetSound() {
         try {
@@ -115,12 +135,6 @@
         window.speechSynthesis.speak(msg);
     }
 
-    async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
-            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
-        }
-    }
-
     function calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 6371e3; 
         const dLat = (lat2-lat1) * Math.PI/180;
@@ -139,19 +153,14 @@
 
         if (lastCoords) {
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
-            // Safety filter for GPS jumps
             const timeDiff = (Date.now() - lastCoords.time) / 3600000;
             if (distance > 0.0006 && (distance / timeDiff) < 210) { 
                 totalDist += distance;
                 partialDist += distance;
-                
-                // CRITICAL BACKGROUND SAVE
                 localStorage.setItem('savedTotal', totalDist);
                 localStorage.setItem('savedPartial', partialDist);
-                
                 document.getElementById('total').innerText = totalDist.toFixed(2);
                 document.getElementById('partial').innerText = partialDist.toFixed(2);
-                
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
                 const totalHours = currentElapsed / 3600000;
                 if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
@@ -166,7 +175,7 @@
             sessionStartTime = Date.now(); 
             timerInterval = setInterval(() => {
                 const ms = accumulatedTime + (Date.now() - sessionStartTime);
-                localStorage.setItem('savedAccumulatedTime', ms); // Save time every second
+                localStorage.setItem('savedAccumulatedTime', ms);
                 const h = Math.floor(ms / 3600000);
                 const m = Math.floor((ms % 3600000) / 60000);
                 const s = Math.floor((ms % 60000) / 1000);
@@ -223,7 +232,7 @@
     document.getElementById('totalArea').addEventListener('touchstart', startPress);
     window.addEventListener('touchend', cancelPress);
 
-    // Final Display Sync on Load
+    // Initial Display Sync
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
     const initialH = Math.floor(accumulatedTime / 3600000);
@@ -231,30 +240,8 @@
     const initialS = Math.floor((accumulatedTime % 60000) / 1000);
     document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
 
-    // This variable holds the "Stay Awake" permission
-let wakeLock = null;
-
-// The function that actually talks to the screen
-async function keepScreenAlive() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      console.log("StageMaster is keeping the screen awake!");
-    }
-  } catch (err) {
-    console.log("Wake Lock failed: " + err.message);
-  }
-}
-
-// Start keeping the screen alive as soon as the page loads
-keepScreenAlive();
-
-// Re-activate it if the user switches back to the app
-document.addEventListener('visibilitychange', async () => {
-  if (wakeLock !== null && document.visibilityState === 'visible') {
-    await keepScreenAlive();
-  }
-});
+    // Force WakeLock on startup
+    requestWakeLock();
 </script>
 </body>
 </html>
