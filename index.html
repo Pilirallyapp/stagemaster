@@ -230,6 +230,31 @@
     const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
     const initialS = Math.floor((accumulatedTime % 60000) / 1000);
     document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
+
+    // This variable holds the "Stay Awake" permission
+let wakeLock = null;
+
+// The function that actually talks to the screen
+async function keepScreenAlive() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log("StageMaster is keeping the screen awake!");
+    }
+  } catch (err) {
+    console.log("Wake Lock failed: " + err.message);
+  }
+}
+
+// Start keeping the screen alive as soon as the page loads
+keepScreenAlive();
+
+// Re-activate it if the user switches back to the app
+document.addEventListener('visibilitychange', async () => {
+  if (wakeLock !== null && document.visibilityState === 'visible') {
+    await keepScreenAlive();
+  }
+});
 </script>
 </body>
 </html>
