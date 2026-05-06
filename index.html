@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>StageMaster by PILI</title>
 
+    <!-- Essential Manifest and Icons -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StageMaster">
 
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; margin: 0; background-color: #1a1a1a; color: white; overflow-x: hidden; padding-top: env(safe-area-inset-top, 10px); }
@@ -18,13 +20,15 @@
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center; width: 94%; max-width: 450px; position: relative; }
         .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; transition: background 0.3s; }
+        .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
+        .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         
-        /* Green flash animation */
-        .flash-go { animation: flash-green 0.8s infinite; border-left-color: #34a853 !important; }
-        @keyframes flash-green {
-            0% { background: #3d3d3d; }
-            50% { background: #1b5e20; }
-            100% { background: #3d3d3d; }
+        /* New Pulse Animation for Total Reset */
+        .pulse-reset { animation: pulse-white 0.6s ease-out; }
+        @keyframes pulse-white {
+            0% { background: #3d3d3d; transform: scale(1); }
+            50% { background: #ffffff; color: #ea4335; transform: scale(1.02); }
+            100% { background: #3d3d3d; transform: scale(1); }
         }
 
         #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #34a853; width: 0%; transition: none; }
@@ -64,7 +68,7 @@
         <div id="progress-bar"></div>
     </div>
 
-    <div id="partialBox" class="metric partial-box" style="border-left: 6px solid #1a73e8; background: #253b5e;">
+    <div id="partialBox" class="metric partial-box">
         <div class="label">Partial Distance</div>
         <div id="partial" class="value">0.00</div>
         <div style="font-size: 0.8rem; color: #888;">KM</div>
@@ -85,26 +89,57 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2.5</div>
+    <div id="status-log">Version 2.2</div>
 </div>
 
 <script>
+    // --- GLOBAL VARIABLES ---
     let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
     let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
-    let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
-    let isWaitingForAccuracy = false;
+    let watchId = null;
+    let lastCoords = null;
+    let timerInterval = null;
+    let sessionStartTime = null;
+    let wakeLock = null;
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.5 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.2 | " + msg; };
 
+    // --- WAKE LOCK ENGINE ---
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
-            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+            try { 
+                wakeLock = await navigator.wakeLock.request('screen');
+                logStatus("Screen Awake Active");
+            } catch (err) {
+                logStatus("WakeLock Error");
+            }
         }
     }
 
-    function speak(text) {
-        const msg = new SpeechSynthesisUtterance(text);
+    // Re-lock ONLY if tracking was already active
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && watchId !== null) {
+            await requestWakeLock();
+        }
+    });
+
+    function playResetSound() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.3);
+        } catch(e) {}
+    }
+
+    function speakReset() {
+        const msg = new SpeechSynthesisUtterance("TOTAL KILOMETERS AND TIMER RESET");
         msg.lang = 'en-US';
         window.speechSynthesis.speak(msg);
     }
@@ -119,100 +154,121 @@
 
     function updateStats(position) {
         const { latitude, longitude, accuracy, speed } = position.coords;
-        const accEl = document.getElementById('accuracy');
-        accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
-        accEl.className = accuracy <= 10 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
-        
+        document.getElementById('accuracy').innerText = `Acc: ${accuracy.toFixed(1)}m`;
+        document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
         if (speed !== null) document.getElementById('currSpeed').innerText = Math.round(speed * 3.6);
 
-        // Accuracy Handshake
-        if (isWaitingForAccuracy && accuracy <= 10) {
-            isWaitingForAccuracy = false;
-            const tBox = document.getElementById('totalArea');
-            tBox.classList.add('flash-go'); // Start flashing
-            speak("Now you can go!");
-            
-            // STOP FLASHING AFTER 5 SECONDS
-            setTimeout(() => {
-                tBox.classList.remove('flash-go');
-            }, 5000);
+        if (accuracy > 40) return; 
 
-            sessionStartTime = Date.now();
-            startTimer();
-        }
-
-        if (isWaitingForAccuracy || accuracy > 40) return; 
-
-        if (lastCoords && watchId !== null) {
+        if (lastCoords) {
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
             const timeDiff = (Date.now() - lastCoords.time) / 3600000;
             if (distance > 0.0006 && (distance / timeDiff) < 210) { 
                 totalDist += distance;
                 partialDist += distance;
-                document.getElementById('total').innerText = totalDist.toFixed(2);
-                document.getElementById('partial').innerText = partialDist.toFixed(2);
                 localStorage.setItem('savedTotal', totalDist);
                 localStorage.setItem('savedPartial', partialDist);
+                document.getElementById('total').innerText = totalDist.toFixed(2);
+                document.getElementById('partial').innerText = partialDist.toFixed(2);
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
-                if (currentElapsed > 0) document.getElementById('speed').innerText = (totalDist / (currentElapsed / 3600000)).toFixed(1);
+                const totalHours = currentElapsed / 3600000;
+                if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
             }
         }
         lastCoords = { latitude, longitude, time: Date.now() };
     }
 
-    function startTimer() {
-        timerInterval = setInterval(() => {
-            const ms = accumulatedTime + (Date.now() - sessionStartTime);
-            localStorage.setItem('savedAccumulatedTime', ms);
-            const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
-            document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }, 1000);
-    }
-
     document.getElementById('toggleBtn').addEventListener('click', async () => {
         if (watchId === null) {
+            // START ACTION
             await requestWakeLock();
-            isWaitingForAccuracy = true;
-            document.getElementById('totalArea').classList.remove('flash-go');
-            speak("Wait until the GPS is accurate.");
-            watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+            sessionStartTime = Date.now(); 
+            timerInterval = setInterval(() => {
+                const ms = accumulatedTime + (Date.now() - sessionStartTime);
+                localStorage.setItem('savedAccumulatedTime', ms);
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                const s = Math.floor((ms % 60000) / 1000);
+                document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }, 1000);
+            lastCoords = null;
+            // ADDED 5s TIMEOUT HEARTBEAT
+            watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
             document.getElementById('toggleBtn').innerText = "STOP";
             document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
         } else {
+            // STOP ACTION
             clearInterval(timerInterval);
-            if (!isWaitingForAccuracy) accumulatedTime += (Date.now() - sessionStartTime);
+            accumulatedTime += (Date.now() - sessionStartTime);
             localStorage.setItem('savedAccumulatedTime', accumulatedTime);
-            isWaitingForAccuracy = false;
-            document.getElementById('totalArea').classList.remove('flash-go');
             navigator.geolocation.clearWatch(watchId);
             watchId = null; lastCoords = null;
+            // RELEASE SCREEN LOCK ON STOP
+            if (wakeLock) { 
+                await wakeLock.release(); 
+                wakeLock = null; 
+                logStatus("Standby - Lock Released");
+            }
             document.getElementById('toggleBtn').innerText = "RESUME";
             document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
         }
     });
 
+    document.getElementById('resetPartialBtn').addEventListener('click', () => {
+        partialDist = 0;
+        localStorage.setItem('savedPartial', 0);
+        document.getElementById('partial').innerText = "0.00";
+        playResetSound();
+        const pBox = document.getElementById('partialBox');
+        pBox.classList.add('flash-active');
+        setTimeout(() => { pBox.classList.remove('flash-active'); }, 500);
+    });
+
     let progressInterval, progressWidth = 0;
-    document.getElementById('totalArea').addEventListener('touchstart', (e) => {
+    const startPress = (e) => {
         e.preventDefault(); progressWidth = 0;
         progressInterval = setInterval(() => {
             progressWidth += 2;
             document.getElementById('progress-bar').style.width = progressWidth + "%";
             if (progressWidth >= 100) {
                 clearInterval(progressInterval);
+                totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.clear();
-                location.reload();
+                if (watchId !== null) { sessionStartTime = Date.now(); }
+                document.getElementById('total').innerText = "0.00"; 
+                document.getElementById('partial').innerText = "0.00";
+                document.getElementById('timer').innerText = "00:00:00"; 
+                document.getElementById('speed').innerText = "0.0";
+                document.getElementById('progress-bar').style.width = "0%";
+                
+                // NEW VISUAL PULSE EFFECT
+                const tBox = document.getElementById('totalArea');
+                tBox.classList.add('pulse-reset');
+                setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
+                
+                speakReset();
             }
         }, 60);
-    });
-    window.addEventListener('touchend', () => { clearInterval(progressInterval); document.getElementById('progress-bar').style.width = "0%"; });
+    };
+    const cancelPress = () => { clearInterval(progressInterval); document.getElementById('progress-bar').style.width = "0%"; };
 
-    document.getElementById('resetPartialBtn').addEventListener('click', () => {
-        partialDist = 0; localStorage.setItem('savedPartial', 0);
-        document.getElementById('partial').innerText = "0.00";
-    });
+    document.getElementById('totalArea').addEventListener('touchstart', startPress);
+    window.addEventListener('touchend', cancelPress);
 
+    // Initial Display Sync
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
+    const initialH = Math.floor(accumulatedTime / 3600000);
+    const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
+    const initialS = Math.floor((accumulatedTime % 60000) / 1000);
+    document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
+
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(() => logStatus("Ready (PWA Active)"))
+            .catch(() => logStatus("Offline Mode Only"));
+    }
 </script>
 </body>
 </html>
