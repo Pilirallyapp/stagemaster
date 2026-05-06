@@ -19,9 +19,18 @@
         .header span { font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-left: 5px; vertical-align: middle; }
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center; width: 94%; max-width: 450px; position: relative; }
         .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
-        .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; }
+        .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; transition: background 0.3s; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
         .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
+        
+        /* New Pulse Animation for Total Reset */
+        .pulse-reset { animation: pulse-white 0.6s ease-out; }
+        @keyframes pulse-white {
+            0% { background: #3d3d3d; transform: scale(1); }
+            50% { background: #ffffff; color: #ea4335; transform: scale(1.02); }
+            100% { background: #3d3d3d; transform: scale(1); }
+        }
+
         #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #34a853; width: 0%; transition: none; }
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
         .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; margin: 2px 0; }
@@ -80,7 +89,7 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2.1</div>
+    <div id="status-log">Version 2.2</div>
 </div>
 
 <script>
@@ -92,9 +101,9 @@
     let lastCoords = null;
     let timerInterval = null;
     let sessionStartTime = null;
-    let wakeLock = null; // Only declared ONCE here
+    let wakeLock = null;
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.1 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.2 | " + msg; };
 
     // --- WAKE LOCK ENGINE ---
     async function requestWakeLock() {
@@ -108,9 +117,9 @@
         }
     }
 
-    // Universal Trigger: Re-activates when returning from ANY other app
+    // Re-lock ONLY if tracking was already active
     document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible') {
+        if (document.visibilityState === 'visible' && watchId !== null) {
             await requestWakeLock();
         }
     });
@@ -171,6 +180,7 @@
 
     document.getElementById('toggleBtn').addEventListener('click', async () => {
         if (watchId === null) {
+            // START ACTION
             await requestWakeLock();
             sessionStartTime = Date.now(); 
             timerInterval = setInterval(() => {
@@ -182,16 +192,23 @@
                 document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
             }, 1000);
             lastCoords = null;
-            watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, { enableHighAccuracy: true, maximumAge: 0 });
+            // ADDED 5s TIMEOUT HEARTBEAT
+            watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
             document.getElementById('toggleBtn').innerText = "STOP";
             document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
         } else {
+            // STOP ACTION
             clearInterval(timerInterval);
             accumulatedTime += (Date.now() - sessionStartTime);
             localStorage.setItem('savedAccumulatedTime', accumulatedTime);
             navigator.geolocation.clearWatch(watchId);
             watchId = null; lastCoords = null;
-            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+            // RELEASE SCREEN LOCK ON STOP
+            if (wakeLock) { 
+                await wakeLock.release(); 
+                wakeLock = null; 
+                logStatus("Standby - Lock Released");
+            }
             document.getElementById('toggleBtn').innerText = "RESUME";
             document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
         }
@@ -223,6 +240,12 @@
                 document.getElementById('timer').innerText = "00:00:00"; 
                 document.getElementById('speed').innerText = "0.0";
                 document.getElementById('progress-bar').style.width = "0%";
+                
+                // NEW VISUAL PULSE EFFECT
+                const tBox = document.getElementById('totalArea');
+                tBox.classList.add('pulse-reset');
+                setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
+                
                 speakReset();
             }
         }, 60);
@@ -240,8 +263,12 @@
     const initialS = Math.floor((accumulatedTime % 60000) / 1000);
     document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
 
-    // Force WakeLock on startup
-    requestWakeLock();
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(() => logStatus("Ready (PWA Active)"))
+            .catch(() => logStatus("Offline Mode Only"));
+    }
 </script>
 </body>
 </html>
