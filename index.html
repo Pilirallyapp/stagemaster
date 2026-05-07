@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>StageMaster by PILI</title>
 
-    <!-- Essential Manifest and Icons -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,7 +22,9 @@
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
         .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         
-        /* New Pulse Animation for Total Reset */
+        /* Version 2.6 Green Flash for Handshake */
+        .go-flash { background: #34a853 !important; transition: background 0.3s; }
+
         .pulse-reset { animation: pulse-white 0.6s ease-out; }
         @keyframes pulse-white {
             0% { background: #3d3d3d; transform: scale(1); }
@@ -89,7 +90,7 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2.2</div>
+    <div id="status-log">Version 2.6</div>
 </div>
 
 <script>
@@ -102,27 +103,30 @@
     let timerInterval = null;
     let sessionStartTime = null;
     let wakeLock = null;
+    let isWaitingForAccuracy = false; // V2.6 Gatekeeper
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.2 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.6 | " + msg; };
 
-    // --- WAKE LOCK ENGINE ---
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
             try { 
                 wakeLock = await navigator.wakeLock.request('screen');
                 logStatus("Screen Awake Active");
-            } catch (err) {
-                logStatus("WakeLock Error");
-            }
+            } catch (err) { logStatus("WakeLock Error"); }
         }
     }
 
-    // Re-lock ONLY if tracking was already active
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible' && watchId !== null) {
             await requestWakeLock();
         }
     });
+
+    function speak(text) {
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'en-US';
+        window.speechSynthesis.speak(msg);
+    }
 
     function playResetSound() {
         try {
@@ -136,12 +140,6 @@
             gainNode.connect(audioCtx.destination);
             oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.3);
         } catch(e) {}
-    }
-
-    function speakReset() {
-        const msg = new SpeechSynthesisUtterance("TOTAL KILOMETERS AND TIMER RESET");
-        msg.lang = 'en-US';
-        window.speechSynthesis.speak(msg);
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -158,7 +156,24 @@
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
         if (speed !== null) document.getElementById('currSpeed').innerText = Math.round(speed * 3.6);
 
-        if (accuracy > 40) return; 
+        // V2.6 HANDSHAKE LOGIC
+        if (isWaitingForAccuracy && accuracy <= 10) {
+            isWaitingForAccuracy = false;
+            speak("Now you can go!");
+            
+            // Visual Flash
+            const tBox = document.getElementById('totalArea');
+            tBox.classList.add('go-flash');
+            setTimeout(() => { tBox.classList.remove('go-flash'); }, 5000);
+
+            // Start Session Now
+            sessionStartTime = Date.now();
+            startTimer();
+            lastCoords = { latitude, longitude, time: Date.now() };
+            return;
+        }
+
+        if (accuracy > 40 || isWaitingForAccuracy) return; 
 
         if (lastCoords) {
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
@@ -178,32 +193,41 @@
         lastCoords = { latitude, longitude, time: Date.now() };
     }
 
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            const ms = accumulatedTime + (Date.now() - sessionStartTime);
+            localStorage.setItem('savedAccumulatedTime', ms);
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+
     document.getElementById('toggleBtn').addEventListener('click', async () => {
         if (watchId === null) {
-            // START ACTION
+            // INITIATE TRACKING
             await requestWakeLock();
-            sessionStartTime = Date.now(); 
-            timerInterval = setInterval(() => {
-                const ms = accumulatedTime + (Date.now() - sessionStartTime);
-                localStorage.setItem('savedAccumulatedTime', ms);
-                const h = Math.floor(ms / 3600000);
-                const m = Math.floor((ms % 3600000) / 60000);
-                const s = Math.floor((ms % 60000) / 1000);
-                document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            }, 1000);
+            isWaitingForAccuracy = true;
+            speak("Waiting for GPS accuracy");
+            
             lastCoords = null;
-            // ADDED 5s TIMEOUT HEARTBEAT
             watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+            
             document.getElementById('toggleBtn').innerText = "STOP";
             document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
         } else {
             // STOP ACTION
+            if (!isWaitingForAccuracy) {
+                accumulatedTime += (Date.now() - sessionStartTime);
+            }
             clearInterval(timerInterval);
-            accumulatedTime += (Date.now() - sessionStartTime);
+            isWaitingForAccuracy = false;
             localStorage.setItem('savedAccumulatedTime', accumulatedTime);
             navigator.geolocation.clearWatch(watchId);
             watchId = null; lastCoords = null;
-            // RELEASE SCREEN LOCK ON STOP
+            
             if (wakeLock) { 
                 await wakeLock.release(); 
                 wakeLock = null; 
@@ -234,19 +258,21 @@
                 clearInterval(progressInterval);
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.clear();
-                if (watchId !== null) { sessionStartTime = Date.now(); }
+                
+                // If currently tracking, reset the session clock too
+                if (watchId !== null && !isWaitingForAccuracy) { sessionStartTime = Date.now(); }
+                
                 document.getElementById('total').innerText = "0.00"; 
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00"; 
                 document.getElementById('speed').innerText = "0.0";
                 document.getElementById('progress-bar').style.width = "0%";
                 
-                // NEW VISUAL PULSE EFFECT
                 const tBox = document.getElementById('totalArea');
                 tBox.classList.add('pulse-reset');
                 setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
                 
-                speakReset();
+                speak("TOTAL KILOMETERS AND TIMER RESET");
             }
         }, 60);
     };
@@ -263,7 +289,6 @@
     const initialS = Math.floor((accumulatedTime % 60000) / 1000);
     document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
 
-    // Service Worker Registration
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
             .then(() => logStatus("Ready (PWA Active)"))
