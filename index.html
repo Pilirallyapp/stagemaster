@@ -22,7 +22,7 @@
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
         .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         
-        /* Version 2.6 Green Flash for Handshake */
+        /* Version 2.7 Green Flash for Handshake */
         .go-flash { background: #34a853 !important; transition: background 0.3s; }
 
         .pulse-reset { animation: pulse-white 0.6s ease-out; }
@@ -90,7 +90,7 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2.6</div>
+    <div id="status-log">Version 2.7</div>
 </div>
 
 <script>
@@ -103,9 +103,9 @@
     let timerInterval = null;
     let sessionStartTime = null;
     let wakeLock = null;
-    let isWaitingForAccuracy = false; // V2.6 Gatekeeper
+    let isWaitingForAccuracy = false; 
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.6 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.7 | " + msg; };
 
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
@@ -156,17 +156,15 @@
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
         if (speed !== null) document.getElementById('currSpeed').innerText = Math.round(speed * 3.6);
 
-        // V2.6 HANDSHAKE LOGIC
+        // V2.7 HANDSHAKE LOGIC (Kept as requested)
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false;
             speak("Now you can go!");
             
-            // Visual Flash
             const tBox = document.getElementById('totalArea');
             tBox.classList.add('go-flash');
             setTimeout(() => { tBox.classList.remove('go-flash'); }, 5000);
 
-            // Start Session Now
             sessionStartTime = Date.now();
             startTimer();
             lastCoords = { latitude, longitude, time: Date.now() };
@@ -178,13 +176,18 @@
         if (lastCoords) {
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
             const timeDiff = (Date.now() - lastCoords.time) / 3600000;
-            if (distance > 0.0006 && (distance / timeDiff) < 210) { 
+
+            // HARD LOGIC FIX V2.7:
+            // Removed "distance > 0.0006" which was stealing kilometers.
+            // We now accept EVERY distance update as long as it's not a teleportation glitch (> 210 km/h)
+            if (distance > 0 && (distance / timeDiff) < 210) { 
                 totalDist += distance;
                 partialDist += distance;
                 localStorage.setItem('savedTotal', totalDist);
                 localStorage.setItem('savedPartial', partialDist);
                 document.getElementById('total').innerText = totalDist.toFixed(2);
                 document.getElementById('partial').innerText = partialDist.toFixed(2);
+                
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
                 const totalHours = currentElapsed / 3600000;
                 if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
@@ -207,7 +210,6 @@
 
     document.getElementById('toggleBtn').addEventListener('click', async () => {
         if (watchId === null) {
-            // INITIATE TRACKING
             await requestWakeLock();
             isWaitingForAccuracy = true;
             speak("Waiting for GPS accuracy");
@@ -218,7 +220,6 @@
             document.getElementById('toggleBtn').innerText = "STOP";
             document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
         } else {
-            // STOP ACTION
             if (!isWaitingForAccuracy) {
                 accumulatedTime += (Date.now() - sessionStartTime);
             }
@@ -259,7 +260,6 @@
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.clear();
                 
-                // If currently tracking, reset the session clock too
                 if (watchId !== null && !isWaitingForAccuracy) { sessionStartTime = Date.now(); }
                 
                 document.getElementById('total').innerText = "0.00"; 
@@ -281,7 +281,6 @@
     document.getElementById('totalArea').addEventListener('touchstart', startPress);
     window.addEventListener('touchend', cancelPress);
 
-    // Initial Display Sync
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
     const initialH = Math.floor(accumulatedTime / 3600000);
