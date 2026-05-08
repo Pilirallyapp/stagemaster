@@ -22,8 +22,13 @@
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
         .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         
-        /* Version 2.7 Green Flash for Handshake */
-        .go-flash { background: #34a853 !important; transition: background 0.3s; }
+        /* NEW 2.71 FLASHING ANIMATION */
+        .go-flash { animation: flashing-green 0.5s infinite; }
+        @keyframes flashing-green {
+            0% { background: #3d3d3d; }
+            50% { background: #34a853; }
+            100% { background: #3d3d3d; }
+        }
 
         .pulse-reset { animation: pulse-white 0.6s ease-out; }
         @keyframes pulse-white {
@@ -90,7 +95,7 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2.7</div>
+    <div id="status-log">Version 2.71</div>
 </div>
 
 <script>
@@ -105,7 +110,7 @@
     let wakeLock = null;
     let isWaitingForAccuracy = false; 
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.7 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.71 | " + msg; };
 
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
@@ -156,13 +161,14 @@
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
         if (speed !== null) document.getElementById('currSpeed').innerText = Math.round(speed * 3.6);
 
-        // V2.7 HANDSHAKE LOGIC (Kept as requested)
+        // V2.71 FLASHING HANDSHAKE LOGIC
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false;
             speak("Now you can go!");
             
             const tBox = document.getElementById('totalArea');
             tBox.classList.add('go-flash');
+            // Flash for 5 seconds then stop
             setTimeout(() => { tBox.classList.remove('go-flash'); }, 5000);
 
             sessionStartTime = Date.now();
@@ -177,9 +183,6 @@
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
             const timeDiff = (Date.now() - lastCoords.time) / 3600000;
 
-            // HARD LOGIC FIX V2.7:
-            // Removed "distance > 0.0006" which was stealing kilometers.
-            // We now accept EVERY distance update as long as it's not a teleportation glitch (> 210 km/h)
             if (distance > 0 && (distance / timeDiff) < 210) { 
                 totalDist += distance;
                 partialDist += distance;
