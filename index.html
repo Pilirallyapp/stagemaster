@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.2</title>
+    <title>StageMaster 3.23</title>
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
@@ -94,10 +94,11 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 3.2</div>
+    <div id="status-log">Version 3.23</div>
 </div>
 
 <script>
+    // --- CORE VARIABLES ---
     let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
     let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
@@ -108,21 +109,27 @@
     let wakeLock = null;
     let isWaitingForAccuracy = false; 
 
-    // V3.2 Navigator Logic
+    // --- NAVIGATOR 3.23 DATA ---
     let trackPoints = [];
     let waypoints = [];
     let isAutoPaused = false;
     let stopTimeStart = null;
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V3.2 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V3.23 | " + msg; };
 
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
             try { 
                 wakeLock = await navigator.wakeLock.request('screen');
-            } catch (err) {}
+            } catch (err) { }
         }
     }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && watchId !== null) {
+            await requestWakeLock();
+        }
+    });
 
     function speak(text) {
         const msg = new SpeechSynthesisUtterance(text);
@@ -154,20 +161,37 @@
 
     function exportGPX() {
         if (trackPoints.length === 0) return;
-        let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="StageMaster" xmlns="http://www.topografix.com/GPX/1/1">
-<metadata><name>StageMaster Path ${new Date().toLocaleString()}</name></metadata>`;
         
-        // Add Waypoints
+        let gpx = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<gpx version="1.1" creator="StageMaster" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata><name>StageMaster_Recce_${new Date().getTime()}</name></metadata>`;
+        
+        // Add Waypoints first for Google My Maps priority
         waypoints.forEach(wp => {
-            gpx += `<wpt lat="${wp.lat}" lon="${wp.lon}"><name>${wp.name}</name></wpt>`;
+            gpx += `
+<wpt lat="${wp.lat}" lon="${wp.lon}">
+    <name>${wp.name}</name>
+    <desc>Rally Waypoint</desc>
+    <sym>Flag, Blue</sym>
+</wpt>`;
         });
 
-        // Add Track with Red Styling for viewers that support it
-        gpx += `<trk><name>Route</name><extensions><line xmlns="http://www.topografix.com/GPX/gpx_style/0/2"><color>FF0000</color><width>3</width></line></extensions><trkseg>`;
+        // Add Track with Red Styling
+        gpx += `
+<trk>
+    <name>Stage Path</name>
+    <extensions>
+      <line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">
+        <color>FF0000</color>
+        <width>4</width>
+      </line>
+    </extensions>
+    <trkseg>`;
+        
         trackPoints.forEach(pt => {
             gpx += `<trkpt lat="${pt.lat}" lon="${pt.lon}"><time>${pt.time}</time></trkpt>`;
         });
+
         gpx += `</trkseg></trk></gpx>`;
 
         const blob = new Blob([gpx], { type: 'application/gpx+xml' });
@@ -180,10 +204,11 @@
 
     function updateStats(position) {
         const { latitude, longitude, accuracy, speed } = position.coords;
-        const speedKmh = speed !== null ? speed * 3.6 : 0;
+        const currentSpeedKmh = speed ? speed * 3.6 : 0;
+        
         document.getElementById('accuracy').innerText = `Acc: ${accuracy.toFixed(1)}m`;
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
-        document.getElementById('currSpeed').innerText = Math.round(speedKmh);
+        document.getElementById('currSpeed').innerText = Math.round(currentSpeedKmh);
 
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false;
@@ -194,14 +219,14 @@
             sessionStartTime = Date.now();
             startTimer();
             lastCoords = { latitude, longitude, time: Date.now() };
-            trackPoints = []; waypoints = []; // Reset path data
+            trackPoints = []; waypoints = []; // Start fresh recce session
             return;
         }
 
         if (accuracy > 40 || isWaitingForAccuracy) return; 
 
-        // V3.2 AUTO-PAUSE LOGIC (60s Threshold)
-        if (speedKmh < 1.0) {
+        // --- 60s AUTO PAUSE LOGIC ---
+        if (currentSpeedKmh < 1.0) {
             if (!isAutoPaused) {
                 if (!stopTimeStart) stopTimeStart = Date.now();
                 if (Date.now() - stopTimeStart > 60000) {
@@ -238,7 +263,8 @@
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
                 const totalHours = currentElapsed / 3600000;
                 if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
-                
+
+                // Record point for GPX
                 trackPoints.push({ lat: latitude, lon: longitude, time: new Date().toISOString() });
             }
         }
@@ -273,12 +299,11 @@
             clearInterval(timerInterval);
             navigator.geolocation.clearWatch(watchId);
             watchId = null; isWaitingForAccuracy = false;
-            
             if (wakeLock) { await wakeLock.release(); wakeLock = null; }
             document.getElementById('toggleBtn').innerText = "RESUME";
             document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
-            
-            // Pop up for save
+
+            // SAVE PROMPT
             if (trackPoints.length > 0) {
                 if (confirm("Would you like to save the route of this trip?")) {
                     exportGPX();
@@ -287,20 +312,17 @@
         }
     });
 
+    // --- RESET PARTIAL + WAYPOINT LOGIC ---
     document.getElementById('resetPartialBtn').addEventListener('click', () => {
-        // V3.2 WAYPOINT LOGIC
         if (watchId !== null && lastCoords) {
             const currentTotal = totalDist.toFixed(2);
-            const lat = lastCoords.latitude.toFixed(5);
-            const lon = lastCoords.longitude.toFixed(5);
             waypoints.push({
                 lat: lastCoords.latitude,
                 lon: lastCoords.longitude,
-                name: `${currentTotal}km | ${lat}, ${lon}`
+                name: `${currentTotal}km | ${lastCoords.latitude.toFixed(5)}, ${lastCoords.longitude.toFixed(5)}`
             });
             speak(`Waypoint saved at ${currentTotal} kilometers`);
         }
-
         partialDist = 0;
         localStorage.setItem('savedPartial', 0);
         document.getElementById('partial').innerText = "0.00";
@@ -310,6 +332,7 @@
         setTimeout(() => { pBox.classList.remove('flash-active'); }, 500);
     });
 
+    // --- TOTAL RESET LOGIC ---
     let progressInterval, progressWidth = 0;
     const startPress = (e) => {
         e.preventDefault(); progressWidth = 0;
@@ -320,16 +343,20 @@
                 clearInterval(progressInterval);
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.clear();
+                
                 if (watchId !== null && !isWaitingForAccuracy) { sessionStartTime = Date.now(); }
+                
                 document.getElementById('total').innerText = "0.00"; 
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00"; 
                 document.getElementById('speed').innerText = "0.0";
                 document.getElementById('progress-bar').style.width = "0%";
+                
                 const tBox = document.getElementById('totalArea');
                 tBox.classList.add('pulse-reset');
                 setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
-                speak("TOTAL RESET");
+                
+                speak("TOTAL KILOMETERS AND TIMER RESET");
             }
         }, 60);
     };
@@ -337,8 +364,13 @@
     document.getElementById('totalArea').addEventListener('touchstart', startPress);
     window.addEventListener('touchend', cancelPress);
 
+    // Initial Sync
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
+    const initialH = Math.floor(accumulatedTime / 3600000);
+    const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
+    const initialS = Math.floor((accumulatedTime % 60000) / 1000);
+    document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
 </script>
 </body>
 </html>
