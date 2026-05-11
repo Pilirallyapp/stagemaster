@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster by PILI</title>
+    <title>StageMaster 3.2</title>
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
@@ -22,7 +22,6 @@
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
         .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         
-        /* NEW 2.71 FLASHING ANIMATION */
         .go-flash { animation: flashing-green 0.5s infinite; }
         @keyframes flashing-green {
             0% { background: #3d3d3d; }
@@ -95,11 +94,10 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 2.71</div>
+    <div id="status-log">Version 3.2</div>
 </div>
 
 <script>
-    // --- GLOBAL VARIABLES ---
     let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
     let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
@@ -110,22 +108,21 @@
     let wakeLock = null;
     let isWaitingForAccuracy = false; 
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V2.71 | " + msg; };
+    // V3.2 Navigator Logic
+    let trackPoints = [];
+    let waypoints = [];
+    let isAutoPaused = false;
+    let stopTimeStart = null;
+
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V3.2 | " + msg; };
 
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
             try { 
                 wakeLock = await navigator.wakeLock.request('screen');
-                logStatus("Screen Awake Active");
-            } catch (err) { logStatus("WakeLock Error"); }
+            } catch (err) {}
         }
     }
-
-    document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible' && watchId !== null) {
-            await requestWakeLock();
-        }
-    });
 
     function speak(text) {
         const msg = new SpeechSynthesisUtterance(text);
@@ -155,29 +152,76 @@
         return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) / 1000; 
     }
 
+    function exportGPX() {
+        if (trackPoints.length === 0) return;
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="StageMaster" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata><name>StageMaster Path ${new Date().toLocaleString()}</name></metadata>`;
+        
+        // Add Waypoints
+        waypoints.forEach(wp => {
+            gpx += `<wpt lat="${wp.lat}" lon="${wp.lon}"><name>${wp.name}</name></wpt>`;
+        });
+
+        // Add Track with Red Styling for viewers that support it
+        gpx += `<trk><name>Route</name><extensions><line xmlns="http://www.topografix.com/GPX/gpx_style/0/2"><color>FF0000</color><width>3</width></line></extensions><trkseg>`;
+        trackPoints.forEach(pt => {
+            gpx += `<trkpt lat="${pt.lat}" lon="${pt.lon}"><time>${pt.time}</time></trkpt>`;
+        });
+        gpx += `</trkseg></trk></gpx>`;
+
+        const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `StageMaster_Route_${new Date().getTime()}.gpx`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
     function updateStats(position) {
         const { latitude, longitude, accuracy, speed } = position.coords;
+        const speedKmh = speed !== null ? speed * 3.6 : 0;
         document.getElementById('accuracy').innerText = `Acc: ${accuracy.toFixed(1)}m`;
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
-        if (speed !== null) document.getElementById('currSpeed').innerText = Math.round(speed * 3.6);
+        document.getElementById('currSpeed').innerText = Math.round(speedKmh);
 
-        // V2.71 FLASHING HANDSHAKE LOGIC
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false;
             speak("Now you can go!");
-            
             const tBox = document.getElementById('totalArea');
             tBox.classList.add('go-flash');
-            // Flash for 5 seconds then stop
             setTimeout(() => { tBox.classList.remove('go-flash'); }, 5000);
-
             sessionStartTime = Date.now();
             startTimer();
             lastCoords = { latitude, longitude, time: Date.now() };
+            trackPoints = []; waypoints = []; // Reset path data
             return;
         }
 
         if (accuracy > 40 || isWaitingForAccuracy) return; 
+
+        // V3.2 AUTO-PAUSE LOGIC (60s Threshold)
+        if (speedKmh < 1.0) {
+            if (!isAutoPaused) {
+                if (!stopTimeStart) stopTimeStart = Date.now();
+                if (Date.now() - stopTimeStart > 60000) {
+                    isAutoPaused = true;
+                    speak("Measurement Paused");
+                    accumulatedTime += (Date.now() - sessionStartTime);
+                    clearInterval(timerInterval);
+                }
+            }
+        } else {
+            stopTimeStart = null;
+            if (isAutoPaused) {
+                isAutoPaused = false;
+                speak("Measurement Resumed");
+                sessionStartTime = Date.now();
+                startTimer();
+            }
+        }
+
+        if (isAutoPaused) return;
 
         if (lastCoords) {
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
@@ -194,6 +238,8 @@
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
                 const totalHours = currentElapsed / 3600000;
                 if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
+                
+                trackPoints.push({ lat: latitude, lon: longitude, time: new Date().toISOString() });
             }
         }
         lastCoords = { latitude, longitude, time: Date.now() };
@@ -216,33 +262,45 @@
             await requestWakeLock();
             isWaitingForAccuracy = true;
             speak("Waiting for GPS accuracy");
-            
             lastCoords = null;
             watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-            
             document.getElementById('toggleBtn').innerText = "STOP";
             document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
         } else {
-            if (!isWaitingForAccuracy) {
+            if (!isWaitingForAccuracy && !isAutoPaused) {
                 accumulatedTime += (Date.now() - sessionStartTime);
             }
             clearInterval(timerInterval);
-            isWaitingForAccuracy = false;
-            localStorage.setItem('savedAccumulatedTime', accumulatedTime);
             navigator.geolocation.clearWatch(watchId);
-            watchId = null; lastCoords = null;
+            watchId = null; isWaitingForAccuracy = false;
             
-            if (wakeLock) { 
-                await wakeLock.release(); 
-                wakeLock = null; 
-                logStatus("Standby - Lock Released");
-            }
+            if (wakeLock) { await wakeLock.release(); wakeLock = null; }
             document.getElementById('toggleBtn').innerText = "RESUME";
             document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
+            
+            // Pop up for save
+            if (trackPoints.length > 0) {
+                if (confirm("Would you like to save the route of this trip?")) {
+                    exportGPX();
+                }
+            }
         }
     });
 
     document.getElementById('resetPartialBtn').addEventListener('click', () => {
+        // V3.2 WAYPOINT LOGIC
+        if (watchId !== null && lastCoords) {
+            const currentTotal = totalDist.toFixed(2);
+            const lat = lastCoords.latitude.toFixed(5);
+            const lon = lastCoords.longitude.toFixed(5);
+            waypoints.push({
+                lat: lastCoords.latitude,
+                lon: lastCoords.longitude,
+                name: `${currentTotal}km | ${lat}, ${lon}`
+            });
+            speak(`Waypoint saved at ${currentTotal} kilometers`);
+        }
+
         partialDist = 0;
         localStorage.setItem('savedPartial', 0);
         document.getElementById('partial').innerText = "0.00";
@@ -262,40 +320,25 @@
                 clearInterval(progressInterval);
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.clear();
-                
                 if (watchId !== null && !isWaitingForAccuracy) { sessionStartTime = Date.now(); }
-                
                 document.getElementById('total').innerText = "0.00"; 
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00"; 
                 document.getElementById('speed').innerText = "0.0";
                 document.getElementById('progress-bar').style.width = "0%";
-                
                 const tBox = document.getElementById('totalArea');
                 tBox.classList.add('pulse-reset');
                 setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
-                
-                speak("TOTAL KILOMETERS AND TIMER RESET");
+                speak("TOTAL RESET");
             }
         }, 60);
     };
     const cancelPress = () => { clearInterval(progressInterval); document.getElementById('progress-bar').style.width = "0%"; };
-
     document.getElementById('totalArea').addEventListener('touchstart', startPress);
     window.addEventListener('touchend', cancelPress);
 
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
-    const initialH = Math.floor(accumulatedTime / 3600000);
-    const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
-    const initialS = Math.floor((accumulatedTime % 60000) / 1000);
-    document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
-
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(() => logStatus("Ready (PWA Active)"))
-            .catch(() => logStatus("Offline Mode Only"));
-    }
 </script>
 </body>
 </html>
