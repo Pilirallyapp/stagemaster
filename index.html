@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.23</title>
+    <title>StageMaster 3.30</title>
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
@@ -94,7 +94,7 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 3.23</div>
+    <div id="status-log">Version 3.30</div>
 </div>
 
 <script>
@@ -109,13 +109,13 @@
     let wakeLock = null;
     let isWaitingForAccuracy = false; 
 
-    // --- NAVIGATOR 3.23 DATA ---
+    // --- NAVIGATOR 3.30 DATA ---
     let trackPoints = [];
     let waypoints = [];
     let isAutoPaused = false;
     let stopTimeStart = null;
 
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V3.23 | " + msg; };
+    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V3.30 | " + msg; };
 
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
@@ -135,6 +135,10 @@
         const msg = new SpeechSynthesisUtterance(text);
         msg.lang = 'en-US';
         window.speechSynthesis.speak(msg);
+    }
+
+    function formatTime24h(date) {
+        return date.toLocaleTimeString('en-GB', { hour12: false });
     }
 
     function playResetSound() {
@@ -162,24 +166,30 @@
     function exportGPX() {
         if (trackPoints.length === 0) return;
         
+        const avgSpeed = document.getElementById('speed').innerText;
+        const totalDuration = document.getElementById('timer').innerText;
+        const finalDist = totalDist.toFixed(2);
+        
         let gpx = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <gpx version="1.1" creator="StageMaster" xmlns="http://www.topografix.com/GPX/1/1">
-<metadata><name>StageMaster_Recce_${new Date().getTime()}</name></metadata>`;
+<metadata>
+    <name>StageMaster Route ${new Date().toLocaleDateString()}</name>
+    <desc>Distance: ${finalDist} KM, Avg Speed: ${avgSpeed} KM/H, Time: ${totalDuration}, Waypoints: ${waypoints.length}</desc>
+</metadata>`;
         
-        // Add Waypoints first for Google My Maps priority
         waypoints.forEach(wp => {
             gpx += `
 <wpt lat="${wp.lat}" lon="${wp.lon}">
+    <ele>${wp.ele}</ele>
     <name>${wp.name}</name>
-    <desc>Rally Waypoint</desc>
-    <sym>Flag, Blue</sym>
+    <desc>Safety Marshal Post at ${wp.dist} KM</desc>
+    <sym>Flag, Red</sym>
 </wpt>`;
         });
 
-        // Add Track with Red Styling
         gpx += `
 <trk>
-    <name>Stage Path</name>
+    <name>Stage Path (${finalDist} KM)</name>
     <extensions>
       <line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">
         <color>FF0000</color>
@@ -189,7 +199,11 @@
     <trkseg>`;
         
         trackPoints.forEach(pt => {
-            gpx += `<trkpt lat="${pt.lat}" lon="${pt.lon}"><time>${pt.time}</time></trkpt>`;
+            gpx += `
+        <trkpt lat="${pt.lat}" lon="${pt.lon}">
+            <ele>${pt.ele}</ele>
+            <time>${pt.time}</time>
+        </trkpt>`;
         });
 
         gpx += `</trkseg></trk></gpx>`;
@@ -198,13 +212,14 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `StageMaster_Route_${new Date().getTime()}.gpx`;
+        a.download = `StageMaster_S_Log_${finalDist}KM.gpx`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
     function updateStats(position) {
-        const { latitude, longitude, accuracy, speed } = position.coords;
+        const { latitude, longitude, accuracy, speed, altitude } = position.coords;
         const currentSpeedKmh = speed ? speed * 3.6 : 0;
+        const ele = altitude ? altitude.toFixed(1) : 0;
         
         document.getElementById('accuracy').innerText = `Acc: ${accuracy.toFixed(1)}m`;
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
@@ -218,14 +233,13 @@
             setTimeout(() => { tBox.classList.remove('go-flash'); }, 5000);
             sessionStartTime = Date.now();
             startTimer();
-            lastCoords = { latitude, longitude, time: Date.now() };
-            trackPoints = []; waypoints = []; // Start fresh recce session
+            lastCoords = { latitude, longitude, altitude: ele, time: Date.now() };
+            trackPoints = []; waypoints = []; 
             return;
         }
 
         if (accuracy > 40 || isWaitingForAccuracy) return; 
 
-        // --- 60s AUTO PAUSE LOGIC ---
         if (currentSpeedKmh < 1.0) {
             if (!isAutoPaused) {
                 if (!stopTimeStart) stopTimeStart = Date.now();
@@ -262,13 +276,18 @@
                 
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
                 const totalHours = currentElapsed / 3600000;
-                if (totalHours > 0) document.getElementById('speed').innerText = (totalDist / totalHours).toFixed(1);
+                const avgSpeedVal = totalHours > 0 ? (totalDist / totalHours).toFixed(1) : "0.0";
+                document.getElementById('speed').innerText = avgSpeedVal;
 
-                // Record point for GPX
-                trackPoints.push({ lat: latitude, lon: longitude, time: new Date().toISOString() });
+                trackPoints.push({ 
+                    lat: latitude, 
+                    lon: longitude, 
+                    ele: ele, 
+                    time: new Date().toISOString() 
+                });
             }
         }
-        lastCoords = { latitude, longitude, time: Date.now() };
+        lastCoords = { latitude, longitude, altitude: ele, time: Date.now() };
     }
 
     function startTimer() {
@@ -303,25 +322,32 @@
             document.getElementById('toggleBtn').innerText = "RESUME";
             document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
 
-            // SAVE PROMPT
             if (trackPoints.length > 0) {
-                if (confirm("Would you like to save the route of this trip?")) {
+                const finalKM = totalDist.toFixed(2);
+                const avgS = document.getElementById('speed').innerText;
+                const totalT = document.getElementById('timer').innerText;
+                const msg = `ROUTE COMPLETED\n\nDistance: ${finalKM} KM\nAvg Speed: ${avgS} KM/H\nTime: ${totalT} (24h)\nSafety Points: ${waypoints.length}\n\nWould you like to export the RED path to Google Maps?`;
+                
+                if (confirm(msg)) {
                     exportGPX();
                 }
             }
         }
     });
 
-    // --- RESET PARTIAL + WAYPOINT LOGIC ---
     document.getElementById('resetPartialBtn').addEventListener('click', () => {
         if (watchId !== null && lastCoords) {
             const currentTotal = totalDist.toFixed(2);
+            const sNumber = waypoints.length + 1;
             waypoints.push({
                 lat: lastCoords.latitude,
                 lon: lastCoords.longitude,
-                name: `${currentTotal}km | ${lastCoords.latitude.toFixed(5)}, ${lastCoords.longitude.toFixed(5)}`
+                ele: lastCoords.altitude,
+                dist: currentTotal,
+                name: `S${sNumber} | ${currentTotal} KM`
             });
-            speak(`Waypoint saved at ${currentTotal} kilometers`);
+            // SIMPLIFIED ANNOUNCEMENT AS REQUESTED
+            speak(`S${sNumber} saved at ${currentTotal} kilometers`);
         }
         partialDist = 0;
         localStorage.setItem('savedPartial', 0);
@@ -332,7 +358,6 @@
         setTimeout(() => { pBox.classList.remove('flash-active'); }, 500);
     });
 
-    // --- TOTAL RESET LOGIC ---
     let progressInterval, progressWidth = 0;
     const startPress = (e) => {
         e.preventDefault(); progressWidth = 0;
@@ -343,19 +368,15 @@
                 clearInterval(progressInterval);
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 localStorage.clear();
-                
                 if (watchId !== null && !isWaitingForAccuracy) { sessionStartTime = Date.now(); }
-                
                 document.getElementById('total').innerText = "0.00"; 
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00"; 
                 document.getElementById('speed').innerText = "0.0";
                 document.getElementById('progress-bar').style.width = "0%";
-                
                 const tBox = document.getElementById('totalArea');
                 tBox.classList.add('pulse-reset');
                 setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
-                
                 speak("TOTAL KILOMETERS AND TIMER RESET");
             }
         }, 60);
@@ -364,7 +385,6 @@
     document.getElementById('totalArea').addEventListener('touchstart', startPress);
     window.addEventListener('touchend', cancelPress);
 
-    // Initial Sync
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
     const initialH = Math.floor(accumulatedTime / 3600000);
