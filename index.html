@@ -3,12 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.40</title>
-
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="stagemaster-icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>StageMaster 3.41</title>
 
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; margin: 0; background-color: #1a1a1a; color: white; overflow-x: hidden; padding-top: env(safe-area-inset-top, 10px); }
@@ -16,13 +11,13 @@
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center; width: 94%; max-width: 450px; position: relative; }
         .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         
-        .total-box { border-left: 6px solid #ea4335; }
+        .total-box { border-left: 6px solid #ea4335; position: relative; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; position: relative; }
         
-        /* Progress Bars */
-        #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ea4335; width: 0%; }
-        #stop-progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff; width: 0%; border-radius: 0 0 12px 12px; }
-        #partial-long-press-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff; width: 0%; }
+        /* Progress Bars - Forced White for Long Presses */
+        #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff !important; width: 0%; z-index: 5; }
+        #stop-progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff !important; width: 0%; border-radius: 0 0 12px 12px; }
+        #partial-long-press-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff !important; width: 0%; z-index: 5; }
 
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
         .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; margin: 2px 0; }
@@ -45,8 +40,7 @@
     <div class="metric">
         <div class="label">Current Speed</div>
         <div id="currSpeed" class="value speed-val">0</div>
-        <div style="font-size: 0.8rem; color: #888;">KM/H</div>
-        <div id="accuracy" style="font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; font-weight: bold;">GPS: OFFLINE</div>
+        <div id="accuracy" style="font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; font-weight: bold; margin-top: 5px; display: inline-block;">GPS: OFFLINE</div>
     </div>
 
     <div class="metric total-box" id="totalArea">
@@ -75,27 +69,25 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div style="font-size: 0.6rem; color: #555; margin-top: 10px;">version 3.40</div>
+    <div style="font-size: 0.6rem; color: #555; margin-top: 10px;">version 3.41</div>
 </div>
 
 <div id="reportModal">
     <div class="modal-content">
         <div style="color: #bf953f; font-size: 1.4rem; margin-bottom: 15px; font-weight: bold;">STAGE COMPLETE</div>
-        <div id="modalData" style="text-align: left; margin-bottom: 20px; font-family: monospace;"></div>
+        <div id="modalData" style="text-align: left; margin-bottom: 20px; font-family: monospace; color: white;"></div>
         <button class="start-btn" onclick="exportKML()">EXPORT TO GOOGLE MAPS</button>
-        <button class="stop-btn" style="height: 40px; margin-top: 10px;" onclick="location.reload()">DISCARD</button>
+        <button class="stop-btn" style="height: 40px; margin-top: 15px; background-color: #555;" onclick="closeModal()">CLOSE & RESUME</button>
     </div>
 </div>
 
 <script>
     let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
-    let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
+    let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
-    
-    let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
-    let lastAlt = null;
+    let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null, lastAlt = null;
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
 
@@ -176,6 +168,7 @@
         }, 1000);
     }
 
+    // --- STOP BUTTON LOGIC ---
     let stopPressTimer, stopProgress = 0;
     const tBtn = document.getElementById('toggleBtn');
     tBtn.addEventListener('touchstart', (e) => {
@@ -205,12 +198,32 @@
         if (!isAutoPaused && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
         clearInterval(timerInterval); navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false;
-        // Count S and RP points only for the summary
+        tBtn.innerText = "RESUME"; tBtn.className = "start-btn";
         const rlyCount = waypoints.filter(w => w.name.includes('S') || w.name.includes('RP')).length;
-        document.getElementById('modalData').innerHTML = `DISTANCE: ${totalDist.toFixed(2)} KM<br>RALLY WAYPOINTS: ${rlyCount}<br>AVG SPEED: ${document.getElementById('speed').innerText} KM/H`;
+        document.getElementById('modalData').innerHTML = `DISTANCE: ${totalDist.toFixed(2)} KM<br>RALLY WAYPOINTS: ${rlyCount}<br>AVG SPEED: ${document.getElementById('speed').innerText} KM/H<br>TIME: ${document.getElementById('timer').innerText}`;
         document.getElementById('reportModal').style.display = 'flex';
     }
 
+    function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready to resume"); }
+
+    // --- TOTAL KM RESET LOGIC (White Bar Fixed) ---
+    let totalPressTimer, totalProgress = 0;
+    document.getElementById('totalArea').addEventListener('touchstart', (e) => {
+        e.preventDefault(); totalProgress = 0;
+        totalPressTimer = setInterval(() => {
+            totalProgress += 2; document.getElementById('progress-bar').style.width = totalProgress + "%";
+            if (totalProgress >= 100) {
+                clearInterval(totalPressTimer); totalDist = 0; partialDist = 0; accumulatedTime = 0;
+                localStorage.clear(); document.getElementById('total').innerText = "0.00"; 
+                document.getElementById('partial').innerText = "0.00"; document.getElementById('timer').innerText = "00:00:00";
+                document.getElementById('speed').innerText = "0.0"; document.getElementById('progress-bar').style.width = "0%";
+                speak("All data reset");
+            }
+        }, 60);
+    });
+    window.addEventListener('touchend', () => { clearInterval(totalPressTimer); document.getElementById('progress-bar').style.width = "0%"; });
+
+    // --- PARTIAL RESET LOGIC ---
     let partialPressTimer, partialProgress = 0, clickCount = 0, clickTimer;
     const pBtn = document.getElementById('resetPartialBtn');
     pBtn.addEventListener('touchstart', (e) => {
@@ -237,15 +250,9 @@
         if (!lastCoords) return;
         const d = totalDist.toFixed(2);
         let name = "", speakText = "";
-        
-        if (type === 'long') { 
-            name = "Pin"; speakText = `No S saved at ${d} kilometers`; 
-        } else if (type === 'double') { 
-            name = `RP${globalWpCounter++}`; speakText = `Radio Point ${globalWpCounter-1} saved at ${d} kilometers`;
-        } else { 
-            name = `S${globalWpCounter++}`; speakText = `S ${globalWpCounter-1} saved at ${d} kilometers`; 
-        }
-        
+        if (type === 'long') { name = "Pin"; speakText = `No S saved at ${d} kilometers`; }
+        else if (type === 'double') { name = `RP${globalWpCounter++}`; speakText = `Radio Point ${globalWpCounter-1} saved at ${d} kilometers`; }
+        else { name = `S${globalWpCounter++}`; speakText = `S ${globalWpCounter-1} saved at ${d} kilometers`; }
         waypoints.push({ lat: lastCoords.latitude, lon: lastCoords.longitude, ele: lastCoords.altitude, name: `${name} | ${d}KM` });
         speak(speakText);
         partialDist = 0; document.getElementById('partial').innerText = "0.00";
@@ -260,7 +267,7 @@
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
         const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `StageMaster_v340.kml`; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `StageMaster_v341.kml`; a.click();
     }
 </script>
 </body>
