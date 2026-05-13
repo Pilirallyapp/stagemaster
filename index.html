@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.34</title>
+    <title>StageMaster 3.35</title>
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
@@ -26,6 +26,11 @@
         .go-flash { animation: flashing-green 0.5s infinite; }
         @keyframes flashing-green { 0% { background: #3d3d3d; } 50% { background: #34a853; } 100% { background: #3d3d3d; } }
 
+        /* Overlay Text Styling */
+        #status-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); font-weight: bold; font-size: 1.2rem; z-index: 10; color: #00f2ff; text-transform: uppercase; }
+        .resuming-flash { animation: flash-text 0.5s step-end infinite; }
+        @keyframes flash-text { 50% { opacity: 0; } }
+
         /* Progress Bars */
         #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ea4335; width: 0%; transition: none; }
         #partial-progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #1a73e8; width: 0%; transition: none; }
@@ -47,7 +52,6 @@
         .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 85px; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
         #status-log { font-size: 0.6rem; color: #666; margin-top: 10px; font-family: monospace; border-top: 1px solid #444; padding-top: 5px; }
 
-        /* CUSTOM REPORT MODAL */
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 90%; max-width: 400px; padding: 20px; border-radius: 25px; border: 2px solid #00f2ff; text-align: center; }
         .modal-header { color: #00f2ff; font-size: 1.4rem; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
@@ -72,7 +76,7 @@
     </div>
 
     <div class="metric total-box" id="totalArea">
-        <div class="label">Total (Hold 3s to Reset)</div>
+        <div id="status-overlay"></div> <div class="label">Total (Hold 3s to Reset)</div>
         <div id="total" class="value">0.00</div>
         <div style="font-size: 0.8rem; color: #888;">KM</div>
         <div id="progress-bar"></div>
@@ -100,7 +104,7 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 3.34</div>
+    <div id="status-log">Version 3.35</div>
 </div>
 
 <div id="reportModal">
@@ -121,7 +125,6 @@
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], wpCounter = 0;
     
-    // Auto-Pause Stability Logic (V3.34)
     let isAutoPaused = false;
     let stopTimeStart = null;
     let moveStrikeCounter = 0;
@@ -156,6 +159,17 @@
         const a = document.createElement('a'); a.href = url; a.download = `StageMaster_Log_${finalDist}KM.gpx`; a.click();
     }
 
+    function showStatus(text, flash = false) {
+        const overlay = document.getElementById('status-overlay');
+        overlay.innerText = text;
+        overlay.style.display = 'flex';
+        overlay.className = flash ? 'resuming-flash' : '';
+    }
+
+    function hideStatus() {
+        document.getElementById('status-overlay').style.display = 'none';
+    }
+
     function updateStats(position) {
         const { latitude, longitude, accuracy, speed, altitude } = position.coords;
         const currentSpeedKmh = speed ? speed * 3.6 : 0;
@@ -170,32 +184,28 @@
             setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
             sessionStartTime = Date.now(); startTimer();
             lastCoords = { latitude, longitude, altitude: ele, time: Date.now() };
-            trackPoints = []; waypoints = []; wpCounter = 0;
             return;
         }
         if (accuracy > 40 || isWaitingForAccuracy) return; 
 
-        // --- V3.34 HYSTERESIS AUTO-PAUSE LOGIC ---
+        // --- V3.35 AUTO-PAUSE LOGIC ---
         if (currentSpeedKmh < 1.0) {
             moveStrikeCounter = 0;
-            if (!isAutoPaused && !stopTimeStart) {
-                stopTimeStart = Date.now();
-            }
+            if (!isAutoPaused && !stopTimeStart) { stopTimeStart = Date.now(); }
             if (!isAutoPaused && stopTimeStart && (Date.now() - stopTimeStart > 60000)) {
                 isAutoPaused = true;
-                speak("Measurement Paused");
+                speak("Auto Paused");
+                showStatus("AUTO PAUSED");
                 accumulatedTime += (Date.now() - sessionStartTime);
                 clearInterval(timerInterval);
             }
-        } else if (currentSpeedKmh >= 3.0) {
+        } else if (currentSpeedKmh >= 1.0) {
+            // New 3.35 Threshold: 1km/h for 3 seconds to resume
             moveStrikeCounter++;
-            if (moveStrikeCounter >= 4) {
+            if (moveStrikeCounter >= 3) {
                 stopTimeStart = null;
                 if (isAutoPaused) {
-                    isAutoPaused = false;
-                    speak("Measurement Resumed");
-                    sessionStartTime = Date.now();
-                    startTimer();
+                    resumeFromPause();
                 }
             }
         }
@@ -220,6 +230,15 @@
         lastCoords = { latitude, longitude, altitude: ele, time: Date.now() };
     }
 
+    function resumeFromPause() {
+        isAutoPaused = false;
+        speak("Resuming measurement");
+        showStatus("RESUMING", true);
+        setTimeout(hideStatus, 5000);
+        sessionStartTime = Date.now();
+        startTimer();
+    }
+
     function startTimer() {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
@@ -229,7 +248,6 @@
         }, 1000);
     }
 
-    // --- STOP BUTTON LOGIC (V3.34) ---
     let stopPressTimer, stopProgress = 0, isLongPressingStop = false;
     const toggleBtn = document.getElementById('toggleBtn');
 
@@ -237,11 +255,9 @@
         if (watchId === null && toggleBtn.innerText === "START TRACKING") return;
         e.preventDefault();
         stopProgress = 0; isLongPressingStop = false;
-        
         if (!document.getElementById('stop-progress-bar')) {
             const pb = document.createElement('div'); pb.id = 'stop-progress-bar'; toggleBtn.appendChild(pb);
         }
-
         stopPressTimer = setInterval(() => {
             stopProgress += 2;
             document.getElementById('stop-progress-bar').style.width = stopProgress + "%";
@@ -261,8 +277,13 @@
             clearInterval(stopPressTimer);
             if (document.getElementById('stop-progress-bar')) document.getElementById('stop-progress-bar').style.width = "0%";
             if (!isLongPressingStop) {
-                if (watchId === null) startTracking(); // Resume action
-                else pauseTracking(); // Pause action
+                if (watchId === null) {
+                    resumeFromPause();
+                    watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
+                    toggleBtn.innerText = "STOP"; toggleBtn.className = "stop-btn";
+                } else {
+                    pauseTracking();
+                }
             }
         }
     });
@@ -280,14 +301,15 @@
         watchId = null; lastCoords = null; isAutoPaused = false; stopTimeStart = null;
         toggleBtn.innerText = "RESUME"; toggleBtn.className = "start-btn";
         speak("Measurement Paused");
+        showStatus("MEASUREMENT PAUSED");
     }
 
     function handleStopSession() {
+        hideStatus();
         pauseTracking();
         if (trackPoints.length > 0) showReport();
     }
 
-    // --- PARTIAL BUTTON GESTURE LOGIC (V3.34) ---
     let partialPressTimer, partialProgress = 0, clickCount = 0, clickTimer, isLongPressingPartial = false;
     const partialBtn = document.getElementById('resetPartialBtn');
 
