@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.30</title>
+    <title>StageMaster 3.34</title>
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
@@ -18,25 +18,19 @@
         .header span { font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-left: 5px; vertical-align: middle; }
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center; width: 94%; max-width: 450px; position: relative; }
         .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
-        .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; transition: background 0.3s; }
-        .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; }
-        .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         
+        .total-box { border-left: 6px solid #ea4335; cursor: pointer; user-select: none; touch-action: none; transition: background 0.3s; }
+        .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; transition: background 0.2s; position: relative; }
+        
+        .flash-active { background: #ffffff !important; color: #1a73e8 !important; }
         .go-flash { animation: flashing-green 0.5s infinite; }
-        @keyframes flashing-green {
-            0% { background: #3d3d3d; }
-            50% { background: #34a853; }
-            100% { background: #3d3d3d; }
-        }
+        @keyframes flashing-green { 0% { background: #3d3d3d; } 50% { background: #34a853; } 100% { background: #3d3d3d; } }
 
-        .pulse-reset { animation: pulse-white 0.6s ease-out; }
-        @keyframes pulse-white {
-            0% { background: #3d3d3d; transform: scale(1); }
-            50% { background: #ffffff; color: #ea4335; transform: scale(1.02); }
-            100% { background: #3d3d3d; transform: scale(1); }
-        }
+        /* Progress Bars */
+        #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ea4335; width: 0%; transition: none; }
+        #partial-progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #1a73e8; width: 0%; transition: none; }
+        #stop-progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff; width: 0%; border-radius: 0 0 12px 12px; }
 
-        #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #34a853; width: 0%; transition: none; }
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
         .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; margin: 2px 0; }
         .speed-val { font-size: 5.5rem; color: #fbbc05; line-height: 0.9; }
@@ -46,10 +40,21 @@
         .accuracy-tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; margin-top: 4px; display: inline-block; font-weight: bold; }
         .acc-good { background: #34a853; color: white; }
         .acc-bad { background: #ea4335; color: white; }
-        button { padding: 12px; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; text-transform: uppercase; touch-action: manipulation; }
+        
+        button { padding: 12px; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; text-transform: uppercase; touch-action: manipulation; position: relative; overflow: hidden; }
         .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 60px; margin-top: 10px; }
+        .stop-btn { background-color: #ea4335; color: white; font-size: 1.4rem; height: 60px; margin-top: 10px; }
         .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 85px; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
         #status-log { font-size: 0.6rem; color: #666; margin-top: 10px; font-family: monospace; border-top: 1px solid #444; padding-top: 5px; }
+
+        /* CUSTOM REPORT MODAL */
+        #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #2d2d2d; width: 90%; max-width: 400px; padding: 20px; border-radius: 25px; border: 2px solid #00f2ff; text-align: center; }
+        .modal-header { color: #00f2ff; font-size: 1.4rem; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .modal-body { text-align: left; margin-bottom: 20px; font-family: monospace; font-size: 1.1rem; line-height: 1.6; }
+        .modal-btn-row { display: flex; gap: 10px; }
+        .save-btn { background: #34a853; color: white; flex: 2; }
+        .cancel-btn { background: #ea4335; color: white; flex: 1; }
     </style>
 </head>
 <body>
@@ -63,7 +68,7 @@
         <div class="label">Current Speed</div>
         <div id="currSpeed" class="value speed-val">0</div>
         <div style="font-size: 0.8rem; color: #888;">KM/H</div>
-        <div id="accuracy" class="accuracy-tag acc-bad">GPS: OFFLINE</div>
+        <div id="accuracy" class="accuracy-tag">GPS: OFFLINE</div>
     </div>
 
     <div class="metric total-box" id="totalArea">
@@ -77,6 +82,7 @@
         <div class="label">Partial Distance</div>
         <div id="partial" class="value">0.00</div>
         <div style="font-size: 0.8rem; color: #888;">KM</div>
+        <div id="partial-progress-bar"></div>
     </div>
 
     <button id="toggleBtn" class="start-btn">START TRACKING</button>
@@ -94,42 +100,31 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div id="status-log">Version 3.30</div>
+    <div id="status-log">Version 3.34</div>
+</div>
+
+<div id="reportModal">
+    <div class="modal-content">
+        <div class="modal-header">STAGEMASTER by PILI</div>
+        <div class="modal-body" id="modalData"></div>
+        <div class="modal-btn-row">
+            <button class="save-btn" onclick="confirmSave()">EXPORT RED PATH</button>
+            <button class="cancel-btn" onclick="closeModal()">CANCEL</button>
+        </div>
+    </div>
 </div>
 
 <script>
-    // --- CORE VARIABLES ---
     let totalDist = parseFloat(localStorage.getItem('savedTotal')) || 0;
     let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
-    let watchId = null;
-    let lastCoords = null;
-    let timerInterval = null;
-    let sessionStartTime = null;
-    let wakeLock = null;
-    let isWaitingForAccuracy = false; 
-
-    // --- NAVIGATOR 3.30 DATA ---
-    let trackPoints = [];
-    let waypoints = [];
+    let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
+    let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], wpCounter = 0;
+    
+    // Auto-Pause Stability Logic (V3.34)
     let isAutoPaused = false;
     let stopTimeStart = null;
-
-    const logStatus = (msg) => { document.getElementById('status-log').innerText = "V3.30 | " + msg; };
-
-    async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
-            try { 
-                wakeLock = await navigator.wakeLock.request('screen');
-            } catch (err) { }
-        }
-    }
-
-    document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible' && watchId !== null) {
-            await requestWakeLock();
-        }
-    });
+    let moveStrikeCounter = 0;
 
     function speak(text) {
         const msg = new SpeechSynthesisUtterance(text);
@@ -137,126 +132,71 @@
         window.speechSynthesis.speak(msg);
     }
 
-    function formatTime24h(date) {
-        return date.toLocaleTimeString('en-GB', { hour12: false });
-    }
-
-    function playResetSound() {
-        try {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.3);
-        } catch(e) {}
-    }
-
     function calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 6371e3; 
-        const dLat = (lat2-lat1) * Math.PI/180;
-        const dLon = (lon2-lon1) * Math.PI/180;
+        const dLat = (lat2-lat1) * Math.PI/180, dLon = (lon2-lon1) * Math.PI/180;
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
         return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) / 1000; 
     }
 
     function exportGPX() {
         if (trackPoints.length === 0) return;
-        
         const avgSpeed = document.getElementById('speed').innerText;
         const totalDuration = document.getElementById('timer').innerText;
         const finalDist = totalDist.toFixed(2);
-        
-        let gpx = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<gpx version="1.1" creator="StageMaster" xmlns="http://www.topografix.com/GPX/1/1">
-<metadata>
-    <name>StageMaster Route ${new Date().toLocaleDateString()}</name>
-    <desc>Distance: ${finalDist} KM, Avg Speed: ${avgSpeed} KM/H, Time: ${totalDuration}, Waypoints: ${waypoints.length}</desc>
-</metadata>`;
-        
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="StageMaster" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>StageMaster Route</name><desc>Dist: ${finalDist}KM, Avg: ${avgSpeed}KM/H, Time: ${totalDuration}</desc></metadata>`;
         waypoints.forEach(wp => {
-            gpx += `
-<wpt lat="${wp.lat}" lon="${wp.lon}">
-    <ele>${wp.ele}</ele>
-    <name>${wp.name}</name>
-    <desc>Safety Marshal Post at ${wp.dist} KM</desc>
-    <sym>Flag, Red</sym>
-</wpt>`;
+            gpx += `<wpt lat="${wp.lat}" lon="${wp.lon}"><ele>${wp.ele}</ele><name>${wp.name}</name><desc>${wp.desc}</desc><sym>Flag, Red</sym></wpt>`;
         });
-
-        gpx += `
-<trk>
-    <name>Stage Path (${finalDist} KM)</name>
-    <extensions>
-      <line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">
-        <color>FF0000</color>
-        <width>4</width>
-      </line>
-    </extensions>
-    <trkseg>`;
-        
-        trackPoints.forEach(pt => {
-            gpx += `
-        <trkpt lat="${pt.lat}" lon="${pt.lon}">
-            <ele>${pt.ele}</ele>
-            <time>${pt.time}</time>
-        </trkpt>`;
-        });
-
+        gpx += `<trk><name>Stage Path (${finalDist} KM)</name><extensions><line xmlns="http://www.topografix.com/GPX/gpx_style/0/2"><color>FF0000</color><width>4</width></line></extensions><trkseg>`;
+        trackPoints.forEach(pt => { gpx += `<trkpt lat="${pt.lat}" lon="${pt.lon}"><ele>${pt.ele}</ele><time>${pt.time}</time></trkpt>`; });
         gpx += `</trkseg></trk></gpx>`;
-
         const blob = new Blob([gpx], { type: 'application/gpx+xml' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `StageMaster_S_Log_${finalDist}KM.gpx`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        const a = document.createElement('a'); a.href = url; a.download = `StageMaster_Log_${finalDist}KM.gpx`; a.click();
     }
 
     function updateStats(position) {
         const { latitude, longitude, accuracy, speed, altitude } = position.coords;
         const currentSpeedKmh = speed ? speed * 3.6 : 0;
         const ele = altitude ? altitude.toFixed(1) : 0;
-        
         document.getElementById('accuracy').innerText = `Acc: ${accuracy.toFixed(1)}m`;
         document.getElementById('accuracy').className = accuracy < 20 ? "accuracy-tag acc-good" : "accuracy-tag acc-bad";
         document.getElementById('currSpeed').innerText = Math.round(currentSpeedKmh);
 
         if (isWaitingForAccuracy && accuracy <= 10) {
-            isWaitingForAccuracy = false;
-            speak("Now you can go!");
-            const tBox = document.getElementById('totalArea');
-            tBox.classList.add('go-flash');
-            setTimeout(() => { tBox.classList.remove('go-flash'); }, 5000);
-            sessionStartTime = Date.now();
-            startTimer();
+            isWaitingForAccuracy = false; speak("Now you can go!");
+            document.getElementById('totalArea').classList.add('go-flash');
+            setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
+            sessionStartTime = Date.now(); startTimer();
             lastCoords = { latitude, longitude, altitude: ele, time: Date.now() };
-            trackPoints = []; waypoints = []; 
+            trackPoints = []; waypoints = []; wpCounter = 0;
             return;
         }
-
         if (accuracy > 40 || isWaitingForAccuracy) return; 
 
+        // --- V3.34 HYSTERESIS AUTO-PAUSE LOGIC ---
         if (currentSpeedKmh < 1.0) {
-            if (!isAutoPaused) {
-                if (!stopTimeStart) stopTimeStart = Date.now();
-                if (Date.now() - stopTimeStart > 60000) {
-                    isAutoPaused = true;
-                    speak("Measurement Paused");
-                    accumulatedTime += (Date.now() - sessionStartTime);
-                    clearInterval(timerInterval);
-                }
+            moveStrikeCounter = 0;
+            if (!isAutoPaused && !stopTimeStart) {
+                stopTimeStart = Date.now();
             }
-        } else {
-            stopTimeStart = null;
-            if (isAutoPaused) {
-                isAutoPaused = false;
-                speak("Measurement Resumed");
-                sessionStartTime = Date.now();
-                startTimer();
+            if (!isAutoPaused && stopTimeStart && (Date.now() - stopTimeStart > 60000)) {
+                isAutoPaused = true;
+                speak("Measurement Paused");
+                accumulatedTime += (Date.now() - sessionStartTime);
+                clearInterval(timerInterval);
+            }
+        } else if (currentSpeedKmh >= 3.0) {
+            moveStrikeCounter++;
+            if (moveStrikeCounter >= 4) {
+                stopTimeStart = null;
+                if (isAutoPaused) {
+                    isAutoPaused = false;
+                    speak("Measurement Resumed");
+                    sessionStartTime = Date.now();
+                    startTimer();
+                }
             }
         }
 
@@ -265,26 +205,16 @@
         if (lastCoords) {
             const distance = calculateDistance(lastCoords.latitude, lastCoords.longitude, latitude, longitude);
             const timeDiff = (Date.now() - lastCoords.time) / 3600000;
-
             if (distance > 0 && (distance / timeDiff) < 210) { 
-                totalDist += distance;
-                partialDist += distance;
-                localStorage.setItem('savedTotal', totalDist);
-                localStorage.setItem('savedPartial', partialDist);
+                totalDist += distance; partialDist += distance;
+                localStorage.setItem('savedTotal', totalDist); localStorage.setItem('savedPartial', partialDist);
                 document.getElementById('total').innerText = totalDist.toFixed(2);
                 document.getElementById('partial').innerText = partialDist.toFixed(2);
-                
                 const currentElapsed = accumulatedTime + (Date.now() - sessionStartTime);
                 const totalHours = currentElapsed / 3600000;
                 const avgSpeedVal = totalHours > 0 ? (totalDist / totalHours).toFixed(1) : "0.0";
                 document.getElementById('speed').innerText = avgSpeedVal;
-
-                trackPoints.push({ 
-                    lat: latitude, 
-                    lon: longitude, 
-                    ele: ele, 
-                    time: new Date().toISOString() 
-                });
+                trackPoints.push({ lat: latitude, lon: longitude, ele: ele, time: new Date().toISOString() });
             }
         }
         lastCoords = { latitude, longitude, altitude: ele, time: Date.now() };
@@ -294,103 +224,145 @@
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             const ms = accumulatedTime + (Date.now() - sessionStartTime);
-            localStorage.setItem('savedAccumulatedTime', ms);
-            const h = Math.floor(ms / 3600000);
-            const m = Math.floor((ms % 3600000) / 60000);
-            const s = Math.floor((ms % 60000) / 1000);
+            const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
             document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }, 1000);
     }
 
-    document.getElementById('toggleBtn').addEventListener('click', async () => {
-        if (watchId === null) {
-            await requestWakeLock();
-            isWaitingForAccuracy = true;
-            speak("Waiting for GPS accuracy");
-            lastCoords = null;
-            watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-            document.getElementById('toggleBtn').innerText = "STOP";
-            document.getElementById('toggleBtn').style.backgroundColor = "#ea4335";
+    // --- STOP BUTTON LOGIC (V3.34) ---
+    let stopPressTimer, stopProgress = 0, isLongPressingStop = false;
+    const toggleBtn = document.getElementById('toggleBtn');
+
+    toggleBtn.addEventListener('touchstart', (e) => {
+        if (watchId === null && toggleBtn.innerText === "START TRACKING") return;
+        e.preventDefault();
+        stopProgress = 0; isLongPressingStop = false;
+        
+        if (!document.getElementById('stop-progress-bar')) {
+            const pb = document.createElement('div'); pb.id = 'stop-progress-bar'; toggleBtn.appendChild(pb);
+        }
+
+        stopPressTimer = setInterval(() => {
+            stopProgress += 2;
+            document.getElementById('stop-progress-bar').style.width = stopProgress + "%";
+            if (stopProgress >= 100) {
+                clearInterval(stopPressTimer); isLongPressingStop = true;
+                handleStopSession();
+                document.getElementById('stop-progress-bar').style.width = "0%";
+            }
+        }, 60);
+    });
+
+    toggleBtn.addEventListener('touchend', () => {
+        if (watchId === null && toggleBtn.innerText === "START TRACKING") {
+            startTracking(); return;
+        }
+        if (stopPressTimer) {
+            clearInterval(stopPressTimer);
+            if (document.getElementById('stop-progress-bar')) document.getElementById('stop-progress-bar').style.width = "0%";
+            if (!isLongPressingStop) {
+                if (watchId === null) startTracking(); // Resume action
+                else pauseTracking(); // Pause action
+            }
+        }
+    });
+
+    async function startTracking() {
+        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+        isWaitingForAccuracy = true; speak("Waiting for GPS accuracy");
+        watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
+        toggleBtn.innerText = "STOP"; toggleBtn.className = "stop-btn";
+    }
+
+    function pauseTracking() {
+        if (!isAutoPaused && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
+        clearInterval(timerInterval); navigator.geolocation.clearWatch(watchId); 
+        watchId = null; lastCoords = null; isAutoPaused = false; stopTimeStart = null;
+        toggleBtn.innerText = "RESUME"; toggleBtn.className = "start-btn";
+        speak("Measurement Paused");
+    }
+
+    function handleStopSession() {
+        pauseTracking();
+        if (trackPoints.length > 0) showReport();
+    }
+
+    // --- PARTIAL BUTTON GESTURE LOGIC (V3.34) ---
+    let partialPressTimer, partialProgress = 0, clickCount = 0, clickTimer, isLongPressingPartial = false;
+    const partialBtn = document.getElementById('resetPartialBtn');
+
+    function handlePartialAction(type) {
+        if (watchId === null || !lastCoords) return;
+        const dist = totalDist.toFixed(2);
+        let label = "", announcement = "", desc = "";
+        if (type === 'long') {
+            label = "Pin"; announcement = `No S saved at ${dist} kilometers`; desc = "No S Marker";
+        } else if (type === 'double') {
+            wpCounter++; label = `RP${wpCounter}`; announcement = `Radio Point ${wpCounter} saved at ${dist} kilometers`; desc = `Radio Point at ${dist}KM`;
         } else {
-            if (!isWaitingForAccuracy && !isAutoPaused) {
-                accumulatedTime += (Date.now() - sessionStartTime);
-            }
-            clearInterval(timerInterval);
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null; isWaitingForAccuracy = false;
-            if (wakeLock) { await wakeLock.release(); wakeLock = null; }
-            document.getElementById('toggleBtn').innerText = "RESUME";
-            document.getElementById('toggleBtn').style.backgroundColor = "#34a853";
-
-            if (trackPoints.length > 0) {
-                const finalKM = totalDist.toFixed(2);
-                const avgS = document.getElementById('speed').innerText;
-                const totalT = document.getElementById('timer').innerText;
-                const msg = `ROUTE COMPLETED\n\nDistance: ${finalKM} KM\nAvg Speed: ${avgS} KM/H\nTime: ${totalT} (24h)\nSafety Points: ${waypoints.length}\n\nWould you like to export the RED path to Google Maps?`;
-                
-                if (confirm(msg)) {
-                    exportGPX();
-                }
-            }
+            wpCounter++; label = `S${wpCounter}`; announcement = `S${wpCounter} saved at ${dist} kilometers`; desc = `Safety Marshal at ${dist}KM`;
         }
-    });
-
-    document.getElementById('resetPartialBtn').addEventListener('click', () => {
-        if (watchId !== null && lastCoords) {
-            const currentTotal = totalDist.toFixed(2);
-            const sNumber = waypoints.length + 1;
-            waypoints.push({
-                lat: lastCoords.latitude,
-                lon: lastCoords.longitude,
-                ele: lastCoords.altitude,
-                dist: currentTotal,
-                name: `S${sNumber} | ${currentTotal} KM`
-            });
-            // SIMPLIFIED ANNOUNCEMENT AS REQUESTED
-            speak(`S${sNumber} saved at ${currentTotal} kilometers`);
-        }
-        partialDist = 0;
-        localStorage.setItem('savedPartial', 0);
+        waypoints.push({ lat: lastCoords.latitude, lon: lastCoords.longitude, ele: lastCoords.altitude, name: `${label} | ${dist} KM`, desc: desc, dist: dist });
+        speak(announcement);
+        partialDist = 0; localStorage.setItem('savedPartial', 0);
         document.getElementById('partial').innerText = "0.00";
-        playResetSound();
-        const pBox = document.getElementById('partialBox');
-        pBox.classList.add('flash-active');
-        setTimeout(() => { pBox.classList.remove('flash-active'); }, 500);
+        document.getElementById('partialBox').classList.add('flash-active');
+        setTimeout(() => document.getElementById('partialBox').classList.remove('flash-active'), 500);
+    }
+
+    partialBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); partialProgress = 0; isLongPressingPartial = false;
+        partialPressTimer = setInterval(() => {
+            partialProgress += 2;
+            document.getElementById('partial-progress-bar').style.width = partialProgress + "%";
+            if (partialProgress >= 100) {
+                clearInterval(partialPressTimer); isLongPressingPartial = true;
+                handlePartialAction('long');
+                document.getElementById('partial-progress-bar').style.width = "0%";
+            }
+        }, 60);
     });
 
-    let progressInterval, progressWidth = 0;
-    const startPress = (e) => {
-        e.preventDefault(); progressWidth = 0;
-        progressInterval = setInterval(() => {
-            progressWidth += 2;
-            document.getElementById('progress-bar').style.width = progressWidth + "%";
-            if (progressWidth >= 100) {
-                clearInterval(progressInterval);
-                totalDist = 0; partialDist = 0; accumulatedTime = 0;
-                localStorage.clear();
-                if (watchId !== null && !isWaitingForAccuracy) { sessionStartTime = Date.now(); }
-                document.getElementById('total').innerText = "0.00"; 
-                document.getElementById('partial').innerText = "0.00";
-                document.getElementById('timer').innerText = "00:00:00"; 
-                document.getElementById('speed').innerText = "0.0";
-                document.getElementById('progress-bar').style.width = "0%";
-                const tBox = document.getElementById('totalArea');
-                tBox.classList.add('pulse-reset');
-                setTimeout(() => { tBox.classList.remove('pulse-reset'); }, 600);
+    partialBtn.addEventListener('touchend', () => {
+        if (partialPressTimer) {
+            clearInterval(partialPressTimer); document.getElementById('partial-progress-bar').style.width = "0%";
+            if (!isLongPressingPartial) {
+                clickCount++;
+                if (clickCount === 1) { clickTimer = setTimeout(() => { handlePartialAction('single'); clickCount = 0; }, 300); }
+                else if (clickCount === 2) { clearTimeout(clickTimer); handlePartialAction('double'); clickCount = 0; }
+            }
+        }
+    });
+
+    function showReport() {
+        const data = `• DISTANCE: ${totalDist.toFixed(2)} KM<br>• AVG SPEED: ${document.getElementById('speed').innerText} KM/H<br>• TIME: ${document.getElementById('timer').innerText}<br>• WAYPOINTS: ${waypoints.length}`;
+        document.getElementById('modalData').innerHTML = data;
+        document.getElementById('reportModal').style.display = 'flex';
+    }
+    function closeModal() { document.getElementById('reportModal').style.display = 'none'; }
+    function confirmSave() { exportGPX(); closeModal(); }
+
+    let totalPressTimer, totalProgress = 0;
+    document.getElementById('totalArea').addEventListener('touchstart', (e) => {
+        e.preventDefault(); totalProgress = 0;
+        totalPressTimer = setInterval(() => {
+            totalProgress += 2;
+            document.getElementById('progress-bar').style.width = totalProgress + "%";
+            if (totalProgress >= 100) {
+                clearInterval(totalPressTimer); totalDist = 0; partialDist = 0; accumulatedTime = 0;
+                localStorage.clear(); document.getElementById('total').innerText = "0.00"; 
+                document.getElementById('partial').innerText = "0.00"; document.getElementById('timer').innerText = "00:00:00";
+                document.getElementById('speed').innerText = "0.0"; document.getElementById('progress-bar').style.width = "0%";
+                document.getElementById('totalArea').classList.add('pulse-reset');
+                setTimeout(() => document.getElementById('totalArea').classList.remove('pulse-reset'), 600);
                 speak("TOTAL KILOMETERS AND TIMER RESET");
             }
         }, 60);
-    };
-    const cancelPress = () => { clearInterval(progressInterval); document.getElementById('progress-bar').style.width = "0%"; };
-    document.getElementById('totalArea').addEventListener('touchstart', startPress);
-    window.addEventListener('touchend', cancelPress);
+    });
+    window.addEventListener('touchend', () => { clearInterval(totalPressTimer); document.getElementById('progress-bar').style.width = "0%"; });
 
     document.getElementById('total').innerText = totalDist.toFixed(2);
     document.getElementById('partial').innerText = partialDist.toFixed(2);
-    const initialH = Math.floor(accumulatedTime / 3600000);
-    const initialM = Math.floor((accumulatedTime % 3600000) / 60000);
-    const initialS = Math.floor((accumulatedTime % 60000) / 1000);
-    document.getElementById('timer').innerText = `${initialH.toString().padStart(2, '0')}:${initialM.toString().padStart(2, '0')}:${initialS.toString().padStart(2, '0')}`;
 </script>
 </body>
 </html>
