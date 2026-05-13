@@ -14,10 +14,13 @@
         .total-box { border-left: 6px solid #ea4335; position: relative; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; position: relative; }
         
-        /* Progress Bars - Forced White for Long Presses */
-        #progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff !important; width: 0%; z-index: 5; }
-        #stop-progress-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff !important; width: 0%; border-radius: 0 0 12px 12px; }
-        #partial-long-press-bar { position: absolute; bottom: 0; left: 0; height: 10px; background: #ffffff !important; width: 0%; z-index: 5; }
+        /* THE STUBBORN WHITE BARS */
+        #progress-bar { position: absolute; bottom: 0; left: 0; height: 12px; background: #ffffff !important; width: 0%; z-index: 99; }
+        #partial-long-press-bar { position: absolute; bottom: 0; left: 0; height: 12px; background: #ffffff !important; width: 0%; z-index: 99; }
+        #stop-progress-bar { position: absolute; bottom: 0; left: 0; height: 12px; background: #ffffff !important; width: 0%; z-index: 99; }
+
+        .go-flash { animation: flashing-green 0.5s infinite; }
+        @keyframes flashing-green { 0% { background: #3d3d3d; } 50% { background: #34a853; } 100% { background: #3d3d3d; } }
 
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
         .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; margin: 2px 0; }
@@ -114,13 +117,18 @@
         document.getElementById('currSpeed').innerText = Math.round(currentSpeedKmh);
 
         if (isWaitingForAccuracy && accuracy <= 10) {
-            isWaitingForAccuracy = false; speak("Now you can go!");
-            sessionStartTime = Date.now(); startTimer();
+            isWaitingForAccuracy = false;
+            speak("Now you can go!");
+            // Restore Green Flash
+            document.getElementById('totalArea').classList.add('go-flash');
+            setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
+            sessionStartTime = Date.now(); 
+            startTimer();
             lastCoords = { latitude, longitude, altitude: altitude || 0, time: Date.now() };
             return;
         }
 
-        if (accuracy > 40 || isWaitingForAccuracy) return; 
+        if (isWaitingForAccuracy || !watchId || accuracy > 40) return; 
 
         if (currentSpeedKmh < 1.0) {
             resumeStrikeStartTime = null; 
@@ -168,35 +176,46 @@
         }, 1000);
     }
 
-    // --- STOP BUTTON LOGIC ---
     let stopPressTimer, stopProgress = 0;
     const tBtn = document.getElementById('toggleBtn');
+    
     tBtn.addEventListener('touchstart', (e) => {
         if (tBtn.innerText === "START TRACKING") return;
-        e.preventDefault(); stopProgress = 0;
-        if (!document.getElementById('stop-progress-bar')) {
-            const pb = document.createElement('div'); pb.id = 'stop-progress-bar'; tBtn.appendChild(pb);
+        e.preventDefault(); 
+        stopProgress = 0;
+        let pb = document.getElementById('stop-progress-bar');
+        if (!pb) {
+            pb = document.createElement('div'); pb.id = 'stop-progress-bar'; tBtn.appendChild(pb);
         }
         stopPressTimer = setInterval(() => {
-            stopProgress += 2; document.getElementById('stop-progress-bar').style.width = stopProgress + "%";
+            stopProgress += 2; 
+            pb.style.width = stopProgress + "%";
             if (stopProgress >= 100) { clearInterval(stopPressTimer); handleStopSession(); }
         }, 60);
     });
+
     tBtn.addEventListener('touchend', () => {
-        if (tBtn.innerText === "START TRACKING") { startTracking(); return; }
-        clearInterval(stopPressTimer); if (document.getElementById('stop-progress-bar')) document.getElementById('stop-progress-bar').style.width = "0%";
+        if (tBtn.innerText === "START TRACKING") { 
+            startTracking(); 
+            return; 
+        }
+        clearInterval(stopPressTimer); 
+        const pb = document.getElementById('stop-progress-bar');
+        if (pb) pb.style.width = "0%";
     });
 
     async function startTracking() {
         if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-        isWaitingForAccuracy = true; speak("Waiting for GPS accuracy");
+        isWaitingForAccuracy = true; 
+        speak("Waiting for GPS accuracy");
         watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
         tBtn.innerText = "STOP"; tBtn.className = "stop-btn";
     }
 
     function handleStopSession() {
         if (!isAutoPaused && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
-        clearInterval(timerInterval); navigator.geolocation.clearWatch(watchId);
+        clearInterval(timerInterval); 
+        navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false;
         tBtn.innerText = "RESUME"; tBtn.className = "start-btn";
         const rlyCount = waypoints.filter(w => w.name.includes('S') || w.name.includes('RP')).length;
@@ -204,42 +223,58 @@
         document.getElementById('reportModal').style.display = 'flex';
     }
 
-    function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready to resume"); }
+    // FIX: Proper Resume after Modal Close
+    function closeModal() { 
+        document.getElementById('reportModal').style.display = 'none'; 
+        speak("Ready to resume"); 
+        // Force button state so the click listener works
+        tBtn.innerText = "RESUME"; 
+        tBtn.className = "start-btn";
+    }
 
-    // --- TOTAL KM RESET LOGIC (White Bar Fixed) ---
+    // FIX: Total Reset White Bar Logic
     let totalPressTimer, totalProgress = 0;
     document.getElementById('totalArea').addEventListener('touchstart', (e) => {
         e.preventDefault(); totalProgress = 0;
         totalPressTimer = setInterval(() => {
-            totalProgress += 2; document.getElementById('progress-bar').style.width = totalProgress + "%";
+            totalProgress += 2; 
+            document.getElementById('progress-bar').style.width = totalProgress + "%";
             if (totalProgress >= 100) {
                 clearInterval(totalPressTimer); totalDist = 0; partialDist = 0; accumulatedTime = 0;
-                localStorage.clear(); document.getElementById('total').innerText = "0.00"; 
-                document.getElementById('partial').innerText = "0.00"; document.getElementById('timer').innerText = "00:00:00";
-                document.getElementById('speed').innerText = "0.0"; document.getElementById('progress-bar').style.width = "0%";
+                localStorage.clear(); 
+                document.getElementById('total').innerText = "0.00"; 
+                document.getElementById('partial').innerText = "0.00"; 
+                document.getElementById('timer').innerText = "00:00:00";
+                document.getElementById('speed').innerText = "0.0"; 
+                document.getElementById('progress-bar').style.width = "0%";
                 speak("All data reset");
             }
         }, 60);
     });
     window.addEventListener('touchend', () => { clearInterval(totalPressTimer); document.getElementById('progress-bar').style.width = "0%"; });
 
-    // --- PARTIAL RESET LOGIC ---
+    // FIX: Partial Reset White Bar Logic
     let partialPressTimer, partialProgress = 0, clickCount = 0, clickTimer;
     const pBtn = document.getElementById('resetPartialBtn');
+    
     pBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault(); partialProgress = 0;
+        e.preventDefault(); 
+        partialProgress = 0;
         partialPressTimer = setInterval(() => {
-            partialProgress += 2; document.getElementById('partial-long-press-bar').style.width = partialProgress + "%";
+            partialProgress += 2; 
+            document.getElementById('partial-long-press-bar').style.width = partialProgress + "%";
             if (partialProgress >= 100) { 
-                clearInterval(partialPressTimer); handlePartialAction('long'); 
+                clearInterval(partialPressTimer); 
+                handlePartialAction('long'); 
                 document.getElementById('partial-long-press-bar').style.width = "0%";
             }
         }, 60);
     });
+
     pBtn.addEventListener('touchend', () => {
         clearInterval(partialPressTimer); 
+        document.getElementById('partial-long-press-bar').style.width = "0%";
         if (partialProgress < 100) {
-            document.getElementById('partial-long-press-bar').style.width = "0%";
             clickCount++;
             if (clickCount === 1) clickTimer = setTimeout(() => { handlePartialAction('single'); clickCount = 0; }, 300);
             else if (clickCount === 2) { clearTimeout(clickTimer); handlePartialAction('double'); clickCount = 0; }
@@ -255,7 +290,8 @@
         else { name = `S${globalWpCounter++}`; speakText = `S ${globalWpCounter-1} saved at ${d} kilometers`; }
         waypoints.push({ lat: lastCoords.latitude, lon: lastCoords.longitude, ele: lastCoords.altitude, name: `${name} | ${d}KM` });
         speak(speakText);
-        partialDist = 0; document.getElementById('partial').innerText = "0.00";
+        partialDist = 0; 
+        document.getElementById('partial').innerText = "0.00";
     }
 
     function exportKML() {
@@ -269,6 +305,19 @@
         const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `StageMaster_v341.kml`; a.click();
     }
+
+    // Handle RESUME after pause/stop
+    tBtn.addEventListener('click', () => {
+        if (tBtn.innerText === "RESUME") {
+            isWaitingForAccuracy = true; 
+            speak("Waiting for GPS accuracy");
+            watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
+            tBtn.innerText = "STOP"; tBtn.className = "stop-btn";
+        }
+    });
+
+    document.getElementById('total').innerText = totalDist.toFixed(2);
+    document.getElementById('partial').innerText = partialDist.toFixed(2);
 </script>
 </body>
 </html>
