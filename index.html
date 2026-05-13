@@ -3,22 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.42</title>
+    <title>StageMaster 3.43</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
-        .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; position: relative; }
+        .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; }
         .metric { margin: 8px 0; padding: 10px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         
         .total-box { border-left: 6px solid #ea4335; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; }
-        
-        /* HIGH-VISIBILITY WHITE BARS */
-        .white-bar { 
-            position: absolute; bottom: 0; left: 0; height: 12px; 
-            background: #ffffff !important; width: 0%; z-index: 9999; 
-            box-shadow: 0 0 10px rgba(255,255,255,0.8);
-        }
 
         .go-flash { animation: flashing-green 0.5s infinite; }
         @keyframes flashing-green { 0% { background: #3d3d3d; } 50% { background: #34a853; } 100% { background: #3d3d3d; } }
@@ -47,9 +40,8 @@
     </div>
 
     <div class="metric total-box" id="totalArea">
-        <div class="label">Total (Hold 3s Reset)</div>
+        <div class="label">Total (Hold Top 3s Reset)</div>
         <div id="total" class="value">0.00</div>
-        <div id="progress-bar" class="white-bar"></div>
     </div>
 
     <div class="metric partial-box">
@@ -58,10 +50,7 @@
     </div>
 
     <button id="toggleBtn" class="start-btn">START TRACKING</button>
-    <button id="resetPartialBtn" class="reset-partial-btn">
-        RESET PARTIAL
-        <div id="partial-bar" class="white-bar"></div>
-    </button>
+    <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;">
@@ -73,7 +62,7 @@
             <div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div>
         </div>
     </div>
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.42</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.43</div>
 </div>
 
 <div id="reportModal">
@@ -89,7 +78,7 @@
     let totalDist = 0, partialDist = 0, accumulatedTime = 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
-    let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null, lastAlt = null;
+    let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
 
@@ -167,30 +156,29 @@
         }, 1000);
     }
 
-    // THE HARD-WIRED TOGGLE
+    // MAIN TOGGLE
     const mainBtn = document.getElementById('toggleBtn');
-    function triggerGPS() {
-        if (!watchId) {
+    mainBtn.addEventListener('touchstart', (e) => {
+        if (mainBtn.innerText === "START TRACKING" || mainBtn.innerText === "RESUME") {
             isWaitingForAccuracy = true;
             speak("Waiting for GPS");
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
             mainBtn.innerText = "STOP"; mainBtn.className = "stop-btn";
-        }
-    }
-
-    mainBtn.addEventListener('touchstart', (e) => {
-        if (mainBtn.innerText === "START TRACKING" || mainBtn.innerText === "RESUME") {
-            triggerGPS();
         } else {
             e.preventDefault();
             let p = 0;
-            let pb = document.createElement('div'); pb.id = "stop-bar"; pb.className = "white-bar";
-            mainBtn.appendChild(pb);
             let itv = setInterval(() => {
-                p += 2; pb.style.width = p + "%";
-                if (p >= 100) { clearInterval(itv); handleStop(); pb.remove(); }
+                p += 2; 
+                mainBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
+                if (p >= 100) { 
+                    clearInterval(itv); handleStop(); 
+                    mainBtn.style.background = "#ea4335";
+                }
             }, 60);
-            mainBtn.addEventListener('touchend', () => { clearInterval(itv); pb.remove(); }, {once:true});
+            mainBtn.addEventListener('touchend', () => { 
+                clearInterval(itv); 
+                mainBtn.style.background = "#ea4335";
+            }, {once:true});
         }
     });
 
@@ -210,15 +198,19 @@
     const pBtn = document.getElementById('resetPartialBtn');
     pBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        let p = 0; let bar = document.getElementById('partial-bar');
+        let p = 0;
         let itv = setInterval(() => {
-            p += 2; bar.style.width = p + "%";
-            if (p >= 100) { clearInterval(itv); mark('long'); bar.style.width = "0%"; }
+            p += 2; 
+            pBtn.style.background = `linear-gradient(to bottom, white ${p}%, #1a73e8 ${p}%)`;
+            if (p >= 100) { 
+                clearInterval(itv); mark('long'); 
+                pBtn.style.background = "#1a73e8";
+            }
         }, 60);
         pBtn.addEventListener('touchend', () => {
             clearInterval(itv);
+            pBtn.style.background = "#1a73e8";
             if (p < 100) {
-                bar.style.width = "0%";
                 if (!window.pClick) {
                     window.pClick = setTimeout(() => { mark('single'); window.pClick = null; }, 300);
                 } else {
@@ -231,21 +223,29 @@
     function mark(type) {
         if (!lastCoords) return;
         let n = "", s = "";
-        if (type === 'long') { n = "Pin"; s = `No S at ${totalDist.toFixed(2)}`; }
-        else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1}`; }
-        else { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1}`; }
-        waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${totalDist.toFixed(2)}KM` });
-        speak(s); partialDist = 0; document.getElementById('partial').innerText = "0.00";
+        const dist = totalDist.toFixed(2);
+        if (type === 'long') { 
+            n = "Pin"; s = `No S saved at ${dist} kilometers`; 
+        } else if (type === 'double') { 
+            n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; 
+        } else { 
+            n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; 
+        }
+        waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${dist}KM` });
+        speak(s); 
+        partialDist = 0; document.getElementById('partial').innerText = "0.00";
     }
 
     // TOTAL RESET
-    document.getElementById('totalArea').addEventListener('touchstart', (e) => {
+    const totalArea = document.getElementById('totalArea');
+    totalArea.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        let p = 0; let bar = document.getElementById('progress-bar');
+        let p = 0;
         let itv = setInterval(() => {
-            p += 2; bar.style.width = p + "%";
+            p += 2; 
+            totalArea.style.background = `linear-gradient(to bottom, white ${p}%, #3d3d3d ${p}%)`;
             if (p >= 100) {
-                clearInterval(itv); bar.style.width = "0%";
+                clearInterval(itv); totalArea.style.background = "#3d3d3d";
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 document.getElementById('total').innerText = "0.00";
                 document.getElementById('partial').innerText = "0.00";
@@ -253,7 +253,9 @@
                 speak("Reset");
             }
         }, 60);
-        document.addEventListener('touchend', () => { clearInterval(itv); bar.style.width = "0%"; }, {once:true});
+        totalArea.addEventListener('touchend', () => { 
+            clearInterval(itv); totalArea.style.background = "#3d3d3d";
+        }, {once:true});
     });
 
     function exportKML() {
