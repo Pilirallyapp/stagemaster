@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.39</title>
+    <title>StageMaster 3.40</title>
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="stagemaster-icon.png">
@@ -12,7 +12,7 @@
 
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; margin: 0; background-color: #1a1a1a; color: white; overflow-x: hidden; padding-top: env(safe-area-inset-top, 10px); }
-        .header h1 { margin: 0; font-size: 1.8rem; letter-spacing: 2px; color: #00f2ff; text-transform: uppercase; display: inline-block; }
+        .header h1 { margin: 0; font-size: 1.8rem; letter-spacing: 2px; color: #bf953f; text-transform: uppercase; display: inline-block; font-weight: 900; }
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-align: center; width: 94%; max-width: 450px; position: relative; }
         .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         
@@ -34,7 +34,7 @@
         .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 85px; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
         
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: #2d2d2d; width: 90%; max-width: 400px; padding: 20px; border-radius: 25px; border: 2px solid #00f2ff; text-align: center; }
+        .modal-content { background: #2d2d2d; width: 90%; max-width: 400px; padding: 20px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
     </style>
 </head>
 <body>
@@ -75,12 +75,12 @@
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div style="font-size: 0.6rem; color: #555; margin-top: 10px;">version 3.39</div>
+    <div style="font-size: 0.6rem; color: #555; margin-top: 10px;">version 3.40</div>
 </div>
 
 <div id="reportModal">
     <div class="modal-content">
-        <div style="color: #00f2ff; font-size: 1.4rem; margin-bottom: 15px;">STAGE COMPLETE</div>
+        <div style="color: #bf953f; font-size: 1.4rem; margin-bottom: 15px; font-weight: bold;">STAGE COMPLETE</div>
         <div id="modalData" style="text-align: left; margin-bottom: 20px; font-family: monospace;"></div>
         <button class="start-btn" onclick="exportKML()">EXPORT TO GOOGLE MAPS</button>
         <button class="stop-btn" style="height: 40px; margin-top: 10px;" onclick="location.reload()">DISCARD</button>
@@ -92,20 +92,17 @@
     let accumulatedTime = parseFloat(localStorage.getItem('savedAccumulatedTime')) || 0; 
     let partialDist = parseFloat(localStorage.getItem('savedPartial')) || 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
-    let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], wpCounter = 0;
+    let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
     
     let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
     let lastAlt = null;
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
 
-    // --- Strict Mountain Filter ---
     function filterAltitude(newAlt, distanceMoved) {
         if (lastAlt === null) { lastAlt = newAlt; return newAlt; }
-        // Spike Logic: If move < 20m and height jump > 10m, ignore it.
         if (Math.abs(newAlt - lastAlt) > 10 && distanceMoved < 0.02) return lastAlt;
-        lastAlt = newAlt;
-        return newAlt;
+        lastAlt = newAlt; return newAlt;
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -133,7 +130,6 @@
 
         if (accuracy > 40 || isWaitingForAccuracy) return; 
 
-        // --- Resume Rule: >= 2km/h for 3 continuous seconds ---
         if (currentSpeedKmh < 1.0) {
             resumeStrikeStartTime = null; 
             if (!isAutoPaused && !stopTimeStart) stopTimeStart = Date.now();
@@ -146,7 +142,7 @@
             stopTimeStart = null;
             if (isAutoPaused) {
                 if (!resumeStrikeStartTime) resumeStrikeStartTime = Date.now();
-                if (Date.now() - resumeStrikeStartTime >= 3000) { // 3 seconds
+                if (Date.now() - resumeStrikeStartTime >= 3000) { 
                     isAutoPaused = false; speak("Measurement Resumed");
                     sessionStartTime = Date.now(); startTimer();
                 }
@@ -183,7 +179,7 @@
     let stopPressTimer, stopProgress = 0;
     const tBtn = document.getElementById('toggleBtn');
     tBtn.addEventListener('touchstart', (e) => {
-        if (watchId === null && tBtn.innerText === "START TRACKING") return;
+        if (tBtn.innerText === "START TRACKING") return;
         e.preventDefault(); stopProgress = 0;
         if (!document.getElementById('stop-progress-bar')) {
             const pb = document.createElement('div'); pb.id = 'stop-progress-bar'; tBtn.appendChild(pb);
@@ -194,7 +190,7 @@
         }, 60);
     });
     tBtn.addEventListener('touchend', () => {
-        if (watchId === null && tBtn.innerText === "START TRACKING") { startTracking(); return; }
+        if (tBtn.innerText === "START TRACKING") { startTracking(); return; }
         clearInterval(stopPressTimer); if (document.getElementById('stop-progress-bar')) document.getElementById('stop-progress-bar').style.width = "0%";
     });
 
@@ -209,7 +205,9 @@
         if (!isAutoPaused && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
         clearInterval(timerInterval); navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false;
-        document.getElementById('modalData').innerHTML = `DISTANCE: ${totalDist.toFixed(2)} KM<br>AVG SPEED: ${document.getElementById('speed').innerText} KM/H`;
+        // Count S and RP points only for the summary
+        const rlyCount = waypoints.filter(w => w.name.includes('S') || w.name.includes('RP')).length;
+        document.getElementById('modalData').innerHTML = `DISTANCE: ${totalDist.toFixed(2)} KM<br>RALLY WAYPOINTS: ${rlyCount}<br>AVG SPEED: ${document.getElementById('speed').innerText} KM/H`;
         document.getElementById('reportModal').style.display = 'flex';
     }
 
@@ -239,9 +237,15 @@
         if (!lastCoords) return;
         const d = totalDist.toFixed(2);
         let name = "", speakText = "";
-        if (type === 'long') { name = "Pin"; speakText = `No S saved at ${d} kilometers`; }
-        else if (type === 'double') { wpCounter++; name = `RP${wpCounter}`; speakText = `Radio Point ${wpCounter} saved at ${d} kilometers`; }
-        else { wpCounter++; name = `S${wpCounter}`; speakText = `S ${wpCounter} saved at ${d} kilometers`; }
+        
+        if (type === 'long') { 
+            name = "Pin"; speakText = `No S saved at ${d} kilometers`; 
+        } else if (type === 'double') { 
+            name = `RP${globalWpCounter++}`; speakText = `Radio Point ${globalWpCounter-1} saved at ${d} kilometers`;
+        } else { 
+            name = `S${globalWpCounter++}`; speakText = `S ${globalWpCounter-1} saved at ${d} kilometers`; 
+        }
+        
         waypoints.push({ lat: lastCoords.latitude, lon: lastCoords.longitude, ele: lastCoords.altitude, name: `${name} | ${d}KM` });
         speak(speakText);
         partialDist = 0; document.getElementById('partial').innerText = "0.00";
@@ -256,7 +260,7 @@
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
         const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `StageMaster_v339.kml`; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `StageMaster_v340.kml`; a.click();
     }
 </script>
 </body>
