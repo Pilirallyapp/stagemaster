@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.43</title>
+    <title>StageMaster 3.44</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -62,7 +62,7 @@
             <div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div>
         </div>
     </div>
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.43</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.44</div>
 </div>
 
 <div id="reportModal">
@@ -171,25 +171,37 @@
                 p += 2; 
                 mainBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
                 if (p >= 100) { 
-                    clearInterval(itv); handleStop(); 
+                    clearInterval(itv); 
+                    isLongPress = true;
+                    handleStop(true); // Open Summary
                     mainBtn.style.background = "#ea4335";
                 }
             }, 60);
+            
+            let isLongPress = false;
             mainBtn.addEventListener('touchend', () => { 
                 clearInterval(itv); 
                 mainBtn.style.background = "#ea4335";
+                if (!isLongPress) {
+                    handleStop(false); // Just Pause
+                }
             }, {once:true});
         }
     });
 
-    function handleStop() {
+    function handleStop(showModal) {
         if (!isAutoPaused && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
-        clearInterval(timerInterval); navigator.geolocation.clearWatch(watchId);
+        clearInterval(timerInterval); 
+        navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false;
         mainBtn.innerText = "RESUME"; mainBtn.className = "start-btn";
-        const count = waypoints.filter(w => !w.name.includes('Pin')).length;
-        document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
-        document.getElementById('reportModal').style.display = 'flex';
+        speak("Measurement Paused");
+
+        if (showModal) {
+            const count = waypoints.filter(w => !w.name.includes('Pin')).length;
+            document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
+            document.getElementById('reportModal').style.display = 'flex';
+        }
     }
 
     function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready"); }
@@ -203,14 +215,15 @@
             p += 2; 
             pBtn.style.background = `linear-gradient(to bottom, white ${p}%, #1a73e8 ${p}%)`;
             if (p >= 100) { 
-                clearInterval(itv); mark('long'); 
+                clearInterval(itv); isLP = true; mark('long'); 
                 pBtn.style.background = "#1a73e8";
             }
         }, 60);
+        let isLP = false;
         pBtn.addEventListener('touchend', () => {
             clearInterval(itv);
             pBtn.style.background = "#1a73e8";
-            if (p < 100) {
+            if (!isLP) {
                 if (!window.pClick) {
                     window.pClick = setTimeout(() => { mark('single'); window.pClick = null; }, 300);
                 } else {
