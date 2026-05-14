@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.49 Pro</title>
+    <title>StageMaster 3.50 Pro</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -47,7 +47,7 @@
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
     </div>
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.49</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.50</div>
 </div>
 
 <div id="reportModal">
@@ -65,11 +65,12 @@
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
     let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
 
+    // SURGICAL INJECTION: GITHUB RAW LINKS (Case-sensitive matched to your Repo)
     const ICONS = {
-        start: 'https://i.postimg.cc/85MscM19/rally-start.png',
-        finish: 'https://i.postimg.cc/m2f6v8S8/rally-finish.png',
-        s: 'https://i.postimg.cc/y8H5S3Kz/orange-marshal.png',
-        rp: 'https://i.postimg.cc/vHLB3zK3/yellow-thunder.png'
+        start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
+        finish: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Flying-flag.png',
+        s: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png',
+        rp: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png'
     };
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
@@ -250,13 +251,13 @@
             kml += `<Placemark><name>${wp.name}</name>${style}<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point></Placemark>`;
         });
 
-        // SURGICAL FINISH FLAG: Added only here, at the final recorded point of the path
         if (trackPoints.length > 0) {
             const last = trackPoints[trackPoints.length - 1];
             kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
         }
 
-        kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>4</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
+        // SURGICAL INJECTION: Path width to 5 for better visibility
+        kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
         
