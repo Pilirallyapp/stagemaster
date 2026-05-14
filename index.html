@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.46 Pro</title>
+    <title>StageMaster 3.49 Pro</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -47,7 +47,7 @@
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
     </div>
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.46</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.49</div>
 </div>
 
 <div id="reportModal">
@@ -63,30 +63,24 @@
     let totalDist = 0, partialDist = 0, accumulatedTime = 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
-    let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null, lastAlt = null;
+    let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
 
     const ICONS = {
-        start: 'https://i.ibb.co/v4mK9Wp/rally-start.png',
-        finish: 'https://i.ibb.co/YyYxS0H/rally-finish.png',
-        s: 'https://i.ibb.co/r7v0xXj/orange-marshal.png',
-        rp: 'https://i.ibb.co/m0fVzC3/yellow-thunder.png'
+        start: 'https://i.postimg.cc/85MscM19/rally-start.png',
+        finish: 'https://i.postimg.cc/m2f6v8S8/rally-finish.png',
+        s: 'https://i.postimg.cc/y8H5S3Kz/orange-marshal.png',
+        rp: 'https://i.postimg.cc/vHLB3zK3/yellow-thunder.png'
     };
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
 
     async function requestWakeLock() {
         try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); }
-        } catch (err) { console.error(`${err.name}, ${err.message}`); }
+        } catch (err) { console.error(err); }
     }
 
     function releaseWakeLock() {
         if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); }
-    }
-
-    function filterAltitude(newAlt, d) {
-        if (lastAlt === null) { lastAlt = newAlt; return newAlt; }
-        if (Math.abs(newAlt - lastAlt) > 10 && d < 0.02) return lastAlt;
-        lastAlt = newAlt; return newAlt;
     }
 
     function updateStats(pos) {
@@ -103,7 +97,7 @@
             setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
             sessionStartTime = Date.now(); startTimer();
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-            mark('start'); // AUTO START FLAG
+            mark('start'); 
             return;
         }
 
@@ -138,14 +132,13 @@
         })(lastCoords.lat, lastCoords.lon, latitude, longitude);
 
         if (d > 0.002) {
-            const fAlt = filterAltitude(altitude || 0, d);
             totalDist += d; partialDist += d;
             document.getElementById('total').innerText = totalDist.toFixed(2);
             document.getElementById('partial').innerText = partialDist.toFixed(2);
             const ms = accumulatedTime + (Date.now() - sessionStartTime);
             document.getElementById('speed').innerText = (totalDist / (ms / 3600000)).toFixed(1);
-            trackPoints.push({ lat: latitude, lon: longitude, ele: fAlt });
-            lastCoords = { lat: latitude, lon: longitude, ele: fAlt, time: Date.now() };
+            trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
+            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
         }
     }
 
@@ -187,7 +180,6 @@
         mainBtn.innerText = "RESUME"; mainBtn.className = "start-btn";
         speak("Measurement Paused"); releaseWakeLock();
         if (showModal) {
-            mark('finish'); // AUTO FINISH FLAG
             const count = waypoints.filter(w => w.type === 's' || w.type === 'rp').length;
             document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
             document.getElementById('reportModal').style.display = 'flex';
@@ -218,8 +210,8 @@
         if (!lastCoords) return;
         let n = "", s = "", iconKey = "";
         const dist = totalDist.toFixed(2);
-        if (type === 'start') { n = "START"; iconKey = "start"; }
-        else if (type === 'finish') { n = "FINISH"; iconKey = "finish"; }
+        
+        if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
         else if (type === 'long') { n = "Pin"; s = `No S saved at ${dist} kilometers`; iconKey = ""; }
         else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
         else { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
@@ -252,13 +244,22 @@
         Object.keys(ICONS).forEach(key => {
             kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>1.2</scale></IconStyle></Style>`;
         });
+        
         waypoints.forEach(wp => {
             let style = wp.type ? `<styleUrl>#${wp.type}Icon</styleUrl>` : '';
             kml += `<Placemark><name>${wp.name}</name>${style}<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point></Placemark>`;
         });
+
+        // SURGICAL FINISH FLAG: Added only here, at the final recorded point of the path
+        if (trackPoints.length > 0) {
+            const last = trackPoints[trackPoints.length - 1];
+            kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
+        }
+
         kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>4</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
+        
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `StageMaster_SS.kml`; a.click();
     }
 </script>
