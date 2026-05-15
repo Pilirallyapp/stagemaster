@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.50 Pro</title>
+    <title>StageMaster 3.51 Pro</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
+        .header h1 span { text-transform: lowercase; font-size: 1.2rem; }
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; position: relative; }
         .metric { margin: 8px 0; padding: 10px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         .total-box { border-left: 6px solid #ea4335; }
@@ -25,7 +26,7 @@
 </head>
 <body>
 
-<div class="header"><h1>STAGEMASTER BY PILI</h1></div>
+<div class="header"><h1>STAGEMASTER <span>by</span> PILI</h1></div>
 
 <div class="card">
     <div class="metric">
@@ -33,21 +34,27 @@
         <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 5rem;">0</div>
         <div id="accuracy" style="font-size: 0.7rem; padding: 4px 10px; border-radius: 10px; font-weight: bold; display: inline-block; background: #ea4335;">GPS: OFFLINE</div>
     </div>
+
     <div class="metric total-box" id="totalArea">
-        <div class="label">Total (Hold Top 3s Reset)</div>
+        <div class="label">Total (HOLD FOR 3 SECONDS TO RESET)</div>
         <div id="total" class="value">0.00</div>
     </div>
+
     <div class="metric partial-box">
         <div class="label">Partial KM</div>
         <div id="partial" class="value">0.00</div>
     </div>
+
     <button id="toggleBtn" class="start-btn">START TRACKING</button>
-    <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
     </div>
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.50</div>
+
+    <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
+
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.51</div>
 </div>
 
 <div id="reportModal">
@@ -65,7 +72,6 @@
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
     let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
 
-    // SURGICAL INJECTION: GITHUB RAW LINKS (Case-sensitive matched to your Repo)
     const ICONS = {
         start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
         finish: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Flying-flag.png',
@@ -213,7 +219,7 @@
         const dist = totalDist.toFixed(2);
         
         if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
-        else if (type === 'long') { n = "Pin"; s = `No S saved at ${dist} kilometers`; iconKey = ""; }
+        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = ""; }
         else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
         else { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
         
@@ -256,7 +262,6 @@
             kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
         }
 
-        // SURGICAL INJECTION: Path width to 5 for better visibility
         kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
