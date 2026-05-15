@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.54 Pro</title>
+    <title>StageMaster 3.55 Pro</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -26,7 +26,6 @@
         .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; width: 100%; }
         .wp-btn { height: 110px; background: #1a1a1a; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: none; }
         
-        /* The ring container */
         .progress-ring {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -35,7 +34,6 @@
             z-index: 1;
         }
 
-        /* Inner mask to create the thin ring appearance */
         .wp-btn::after {
             content: '';
             position: absolute;
@@ -50,6 +48,20 @@
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
+        
+        /* v3.55 Input Styles */
+        .stage-input {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            background: #1a1a1a;
+            border: 2px solid #bf953f;
+            border-radius: 10px;
+            color: white;
+            font-size: 1rem;
+            text-align: center;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -100,13 +112,16 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.54</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.55</div>
 </div>
 
 <div id="reportModal">
     <div class="modal-content">
         <div style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">STAGE SUMMARY</div>
-        <div id="modalData" style="text-align: left; font-family: monospace; color: white; margin-bottom: 25px; line-height: 1.6;"></div>
+        <div id="modalData" style="text-align: left; font-family: monospace; color: white; margin-bottom: 15px; line-height: 1.6;"></div>
+        
+        <input type="text" id="stageName" class="stage-input" placeholder="Enter Stage Name (e.g. SS1_Acropolis)">
+        
         <button class="start-btn" onclick="exportKML()">EXPORT KML</button>
         <button class="stop-btn" style="background: #555; height: 50px; margin-top: 15px;" onclick="closeModal()">CLOSE & RESUME</button>
     </div>
@@ -232,7 +247,6 @@
     const pBtn = document.getElementById('resetPartialBtn');
     pBtn.onclick = () => { partialDist = 0; document.getElementById('partial').innerText = "0.00"; speak("Partial Reset"); };
 
-    /* NEW CONIC PROGRESS ENGINE */
     function setupWaypointBtn(id, ringId, color, type) {
         const btn = document.getElementById(id);
         const ring = document.getElementById(ringId);
@@ -241,7 +255,7 @@
             e.preventDefault();
             let deg = 0;
             timer = setInterval(() => {
-                deg += 7.2; // 360 degrees / 50 steps (40ms * 50 = 2000ms)
+                deg += 7.2;
                 ring.style.background = `conic-gradient(${color} ${deg}deg, #444 ${deg}deg)`;
                 if (deg >= 360) {
                     clearInterval(timer);
@@ -292,7 +306,11 @@
     });
 
     function exportKML() {
-        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>StageMaster Path</name>`;
+        // v3.55 Dynamic Filename Logic
+        const rawName = document.getElementById('stageName').value.trim();
+        const fileName = rawName ? rawName : "StageMaster_SS";
+        
+        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${fileName}</name>`;
         Object.keys(ICONS).forEach(key => {
             kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>2.5</scale></IconStyle></Style>`;
         });
@@ -307,7 +325,11 @@
         kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `StageMaster_SS.kml`; a.click();
+        
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); 
+        a.download = `${fileName}.kml`; 
+        a.click();
     }
 </script>
 </body>
