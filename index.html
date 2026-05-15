@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.51 Pro</title>
+    <title>StageMaster 3.52 Pro</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -16,10 +16,19 @@
         @keyframes flashing-green { 0% { background: #3d3d3d; } 50% { background: #34a853; } 100% { background: #3d3d3d; } }
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; }
         .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; }
-        button { padding: 12px; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; text-transform: uppercase; touch-action: none; position: relative; }
-        .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 65px; margin-top: 10px; }
-        .stop-btn { background-color: #ea4335; color: white; font-size: 1.4rem; height: 65px; margin-top: 10px; }
-        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 90px; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
+        
+        button { border: none; border-radius: 12px; cursor: pointer; font-weight: bold; text-transform: uppercase; touch-action: none; position: relative; overflow: hidden; }
+        .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 65px; width: 100%; margin-top: 10px; }
+        .stop-btn { background-color: #ea4335; color: white; font-size: 1.4rem; height: 65px; width: 100%; margin-top: 10px; }
+        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 90px; width: 100%; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
+        
+        /* WAYPOINT TOOLBAR */
+        .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; width: 100%; }
+        .wp-btn { height: 110px; background: #1a1a1a; border: 3px solid #444; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .wp-btn img { width: 45px; height: 45px; object-fit: contain; z-index: 2; margin-bottom: 2px; }
+        .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 2; }
+        .progress-fill { position: absolute; top: 0; left: 0; width: 100%; height: 0%; background: rgba(255, 255, 255, 0.15); transition: height 0.1s linear; z-index: 1; }
+
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
     </style>
@@ -54,7 +63,24 @@
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 3.51</div>
+    <div class="toolbar">
+        <button class="wp-btn" id="btn-rp" style="border-color: #fbbc05; color: #fbbc05;">
+            <div class="progress-fill"></div>
+            <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png">
+            <div class="wp-label">R P</div>
+        </button>
+        <button class="wp-btn" id="btn-nos" style="border-color: #1a73e8; color: #1a73e8;">
+            <div class="progress-fill"></div>
+            <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png" style="filter: hue-rotate(180deg);"> <div class="wp-label">NO S</div>
+        </button>
+        <button class="wp-btn" id="btn-marshal" style="border-color: #e67e22; color: #e67e22;">
+            <div class="progress-fill"></div>
+            <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png">
+            <div class="wp-label">MARSHAL</div>
+        </button>
+    </div>
+
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.52</div>
 </div>
 
 <div id="reportModal">
@@ -86,9 +112,7 @@
         } catch (err) { console.error(err); }
     }
 
-    function releaseWakeLock() {
-        if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); }
-    }
+    function releaseWakeLock() { if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); } }
 
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
@@ -104,8 +128,7 @@
             setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
             sessionStartTime = Date.now(); startTimer();
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-            mark('start'); 
-            return;
+            mark('start'); return;
         }
 
         if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
@@ -161,8 +184,7 @@
     const mainBtn = document.getElementById('toggleBtn');
     mainBtn.addEventListener('touchstart', (e) => {
         if (mainBtn.innerText === "START TRACKING" || mainBtn.innerText === "RESUME") {
-            isWaitingForAccuracy = true; speak("Waiting for GPS accuracy");
-            requestWakeLock();
+            isWaitingForAccuracy = true; requestWakeLock();
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
             mainBtn.innerText = "STOP"; mainBtn.className = "stop-btn";
         } else {
@@ -170,13 +192,9 @@
             let p = 0;
             let itv = setInterval(() => {
                 p += 2; mainBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
-                if (p >= 100) { clearInterval(itv); isLP = true; handleStop(true); mainBtn.style.background = "#ea4335"; }
+                if (p >= 100) { clearInterval(itv); handleStop(true); mainBtn.style.background = "#ea4335"; }
             }, 60);
-            let isLP = false;
-            mainBtn.addEventListener('touchend', () => { 
-                clearInterval(itv); mainBtn.style.background = "#ea4335";
-                if (!isLP) handleStop(false);
-            }, {once:true});
+            mainBtn.addEventListener('touchend', () => { clearInterval(itv); mainBtn.style.background = "#ea4335"; if(p<100) handleStop(false); }, {once:true});
         }
     });
 
@@ -195,79 +213,10 @@
 
     function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready"); }
 
+    // RESET PARTIAL (SIMPLE)
     const pBtn = document.getElementById('resetPartialBtn');
-    pBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        let p = 0;
-        let itv = setInterval(() => {
-            p += 2; pBtn.style.background = `linear-gradient(to bottom, white ${p}%, #1a73e8 ${p}%)`;
-            if (p >= 100) { clearInterval(itv); isLP = true; mark('long'); pBtn.style.background = "#1a73e8"; }
-        }, 60);
-        let isLP = false;
-        pBtn.addEventListener('touchend', () => {
-            clearInterval(itv); pBtn.style.background = "#1a73e8";
-            if (!isLP) {
-                if (!window.pClick) { window.pClick = setTimeout(() => { mark('single'); window.pClick = null; }, 300); }
-                else { clearTimeout(window.pClick); window.pClick = null; mark('double'); }
-            }
-        }, {once:true});
-    });
+    pBtn.onclick = () => { partialDist = 0; document.getElementById('partial').innerText = "0.00"; speak("Partial Reset"); };
 
-    function mark(type) {
-        if (!lastCoords) return;
-        let n = "", s = "", iconKey = "";
-        const dist = totalDist.toFixed(2);
-        
-        if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
-        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = ""; }
-        else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
-        else { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
-        
-        waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${dist}KM`, type: iconKey });
-        if(s) speak(s);
-        partialDist = 0; document.getElementById('partial').innerText = "0.00";
-    }
-
-    const totalArea = document.getElementById('totalArea');
-    totalArea.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        let p = 0;
-        let itv = setInterval(() => {
-            p += 2; totalArea.style.background = `linear-gradient(to bottom, white ${p}%, #3d3d3d ${p}%)`;
-            if (p >= 100) {
-                clearInterval(itv); totalArea.style.background = "#3d3d3d";
-                totalDist = 0; partialDist = 0; accumulatedTime = 0;
-                document.getElementById('total').innerText = "0.00";
-                document.getElementById('partial').innerText = "0.00";
-                document.getElementById('timer').innerText = "00:00:00";
-                speak("TOTAL KILOMETERS AND TIMER RESET");
-            }
-        }, 60);
-        totalArea.addEventListener('touchend', () => { clearInterval(itv); totalArea.style.background = "#3d3d3d"; }, {once:true});
-    });
-
-    function exportKML() {
-        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>StageMaster Path</name>`;
-        Object.keys(ICONS).forEach(key => {
-            kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>1.2</scale></IconStyle></Style>`;
-        });
-        
-        waypoints.forEach(wp => {
-            let style = wp.type ? `<styleUrl>#${wp.type}Icon</styleUrl>` : '';
-            kml += `<Placemark><name>${wp.name}</name>${style}<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point></Placemark>`;
-        });
-
-        if (trackPoints.length > 0) {
-            const last = trackPoints[trackPoints.length - 1];
-            kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
-        }
-
-        kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
-        trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
-        kml += `</coordinates></LineString></Placemark></Document></kml>`;
-        
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `StageMaster_SS.kml`; a.click();
-    }
-</script>
-</body>
-</html>
+    // WAYPOINT TOOLBAR ENGINE
+    function setupWaypointBtn(id, type) {
+        const btn = document
