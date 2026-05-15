@@ -3,12 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.57 Pro</title>
+    <title>StageMaster 3.60 Navigator</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
         .header h1 span { text-transform: lowercase; font-size: 1.2rem; }
         .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; position: relative; }
+        
+        /* v3.60 Mode Switcher Styles */
+        .mode-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 15px; }
+        .mode-btn { height: 45px; background: #3d3d3d; color: #888; border-radius: 12px; font-size: 0.8rem; border: 2px solid transparent; }
+        .mode-btn.active { background: #bf953f; color: black; border-color: white; }
+
         .metric { margin: 8px 0; padding: 10px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         .total-box { border-left: 6px solid #ea4335; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; }
@@ -45,6 +51,16 @@
 <div class="header"><h1>STAGEMASTER <span>by</span> PILI</h1></div>
 
 <div class="card">
+    <div class="mode-container">
+        <button id="modeRec" class="mode-btn active" onclick="switchMode('REC')">REC MODE</button>
+        <button id="modeNav" class="mode-btn" onclick="switchMode('NAV')">NAV MODE</button>
+    </div>
+
+    <div id="navControls" style="display: none; margin-bottom: 10px;">
+        <input type="file" id="kmlInput" accept=".kml" style="display: none;" onchange="startImport(event)">
+        <button class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
+    </div>
+
     <div class="metric">
         <div class="label">Speed KM/H</div>
         <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 5rem;">0</div>
@@ -52,12 +68,12 @@
     </div>
 
     <div class="metric total-box" id="totalArea">
-        <div class="label">Total (HOLD FOR 3 SECONDS TO RESET)</div>
+        <div class="label" id="totalLabel">Total (HOLD FOR 3 SECONDS TO RESET)</div>
         <div id="total" class="value">0.00</div>
     </div>
 
     <div class="metric partial-box">
-        <div class="label">Partial KM</div>
+        <div class="label" id="partialLabel">Partial KM</div>
         <div id="partial" class="value">0.00</div>
     </div>
 
@@ -70,7 +86,7 @@
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
 
-    <div class="toolbar">
+    <div class="toolbar" id="recorderToolbar">
         <button class="wp-btn" id="btn-rp">
             <div class="progress-ring" id="ring-rp"></div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png">
@@ -88,30 +104,28 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.57</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.60</div>
 </div>
 
 <div id="reportModal">
     <div class="modal-content">
         <div style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">STAGE SUMMARY</div>
         <div id="modalData" style="text-align: left; font-family: monospace; color: white; margin-bottom: 5px; line-height: 1.6;"></div>
-        
         <div class="stage-input-group">
             <input type="text" id="stageName" class="stage-input" placeholder="Name Stage (e.g. SS1)">
             <button id="saveNameBtn" class="confirm-name-btn" onclick="saveFileName()">SAVE</button>
         </div>
-        
         <button id="exportBtn" class="start-btn" onclick="exportKML()">DOWNLOAD KML FILE</button>
         <button class="stop-btn" style="background: #555; height: 50px; margin-top: 15px;" onclick="closeModal()">CLOSE & RESUME</button>
     </div>
 </div>
 
 <script>
-    /* GPS Logic and Initialization same as v3.56 */
     let totalDist = 0, partialDist = 0, accumulatedTime = 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
     let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
+    let currentMode = 'REC';
 
     const ICONS = {
         start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
@@ -124,6 +138,26 @@
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
     async function requestWakeLock() { try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {} }
     function releaseWakeLock() { if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); } }
+
+    /* v3.60 Mode Switch Logic */
+    function switchMode(mode) {
+        currentMode = mode;
+        document.getElementById('modeRec').classList.toggle('active', mode === 'REC');
+        document.getElementById('modeNav').classList.toggle('active', mode === 'NAV');
+        document.getElementById('recorderToolbar').style.display = (mode === 'REC') ? 'grid' : 'none';
+        document.getElementById('navControls').style.display = (mode === 'NAV') ? 'block' : 'none';
+        document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Dist to Next WP' : 'Partial KM';
+        document.getElementById('resetPartialBtn').style.display = (mode === 'REC') ? 'block' : 'none';
+        speak(mode === 'REC' ? "Recording mode" : "Navigation mode");
+    }
+
+    function startImport(event) {
+        const file = event.target.files[0];
+        if (file) {
+            speak("File selected. Ready to process.");
+            // Parsing logic will follow in next step
+        }
+    }
 
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
