@@ -71,7 +71,8 @@
         </button>
         <button class="wp-btn" id="btn-nos" style="border-color: #1a73e8; color: #1a73e8;">
             <div class="progress-fill"></div>
-            <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png" style="filter: hue-rotate(180deg);"> <div class="wp-label">NO S</div>
+            <img src="https://i.postimg.cc/mD8x8838/blue-pin.png"> 
+            <div class="wp-label">NO S</div>
         </button>
         <button class="wp-btn" id="btn-marshal" style="border-color: #e67e22; color: #e67e22;">
             <div class="progress-fill"></div>
@@ -102,7 +103,8 @@
         start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
         finish: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Flying-flag.png',
         s: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png',
-        rp: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png'
+        rp: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png',
+        nos: 'https://i.postimg.cc/mD8x8838/blue-pin.png' // Blue Pin Icon
     };
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
@@ -213,10 +215,81 @@
 
     function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready"); }
 
-    // RESET PARTIAL (SIMPLE)
     const pBtn = document.getElementById('resetPartialBtn');
     pBtn.onclick = () => { partialDist = 0; document.getElementById('partial').innerText = "0.00"; speak("Partial Reset"); };
 
-    // WAYPOINT TOOLBAR ENGINE
     function setupWaypointBtn(id, type) {
-        const btn = document
+        const btn = document.getElementById(id);
+        const fill = btn.querySelector('.progress-fill');
+        let timer;
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            let progress = 0;
+            timer = setInterval(() => {
+                progress += 2;
+                fill.style.height = progress + '%';
+                if (progress >= 100) {
+                    clearInterval(timer); fill.style.height = '0%';
+                    mark(type);
+                    partialDist = 0; document.getElementById('partial').innerText = "0.00"; 
+                }
+            }, 40); 
+        });
+        btn.addEventListener('touchend', () => { clearInterval(timer); fill.style.height = '0%'; });
+    }
+
+    setupWaypointBtn('btn-rp', 'double');
+    setupWaypointBtn('btn-nos', 'long');
+    setupWaypointBtn('btn-marshal', 'marshal');
+
+    function mark(type) {
+        if (!lastCoords) return;
+        let n = "", s = "", iconKey = "";
+        const dist = totalDist.toFixed(2);
+        if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
+        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = "nos"; } // Corrected to blue pin key
+        else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
+        else if (type === 'marshal') { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
+        waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${dist}KM`, type: iconKey });
+        if(s) speak(s);
+    }
+
+    const totalArea = document.getElementById('totalArea');
+    totalArea.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        let p = 0;
+        let itv = setInterval(() => {
+            p += 2; totalArea.style.background = `linear-gradient(to bottom, white ${p}%, #3d3d3d ${p}%)`;
+            if (p >= 100) {
+                clearInterval(itv); totalArea.style.background = "#3d3d3d";
+                totalDist = 0; partialDist = 0; accumulatedTime = 0;
+                document.getElementById('total').innerText = "0.00";
+                document.getElementById('partial').innerText = "0.00";
+                document.getElementById('timer').innerText = "00:00:00";
+                speak("TOTAL KILOMETERS AND TIMER RESET");
+            }
+        }, 60);
+        totalArea.addEventListener('touchend', () => { clearInterval(itv); totalArea.style.background = "#3d3d3d"; }, {once:true});
+    });
+
+    function exportKML() {
+        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>StageMaster Path</name>`;
+        Object.keys(ICONS).forEach(key => {
+            kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>2.5</scale></IconStyle></Style>`;
+        });
+        waypoints.forEach(wp => {
+            let style = wp.type ? `<styleUrl>#${wp.type}Icon</styleUrl>` : '';
+            kml += `<Placemark><name>${wp.name}</name>${style}<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point></Placemark>`;
+        });
+        if (trackPoints.length > 0) {
+            const last = trackPoints[trackPoints.length - 1];
+            kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
+        }
+        kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
+        trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
+        kml += `</coordinates></LineString></Placemark></Document></kml>`;
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `StageMaster_SS.kml`; a.click();
+    }
+</script>
+</body>
+</html>
