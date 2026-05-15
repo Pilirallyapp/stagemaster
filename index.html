@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.56 Pro</title>
+    <title>StageMaster 3.57 Pro</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -30,16 +30,14 @@
         .wp-btn img { width: 65px; height: 65px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
         .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 3; }
 
-        /* Modal Styles */
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
         
-        /* v3.56 Saving Logic Styles */
         .stage-input-group { display: flex; gap: 5px; margin: 15px 0; }
         .stage-input { flex-grow: 1; padding: 12px; background: #1a1a1a; border: 2px solid #bf953f; border-radius: 10px; color: white; font-size: 1rem; text-align: center; }
         .stage-input.locked { border-color: #34a853; background: #1b2e1f; }
-        .confirm-name-btn { background: #bf953f; color: black; padding: 0 15px; border-radius: 10px; font-size: 0.8rem; }
-        #exportBtn { opacity: 0.4; pointer-events: none; } /* Disabled until name is locked */
+        .confirm-name-btn { background: #bf953f; color: black; padding: 0 15px; border-radius: 10px; font-size: 0.8rem; transition: background 0.3s; }
+        #exportBtn { opacity: 0.4; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -90,7 +88,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.56</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.57</div>
 </div>
 
 <div id="reportModal">
@@ -100,7 +98,7 @@
         
         <div class="stage-input-group">
             <input type="text" id="stageName" class="stage-input" placeholder="Name Stage (e.g. SS1)">
-            <button class="confirm-name-btn" onclick="lockFileName()">LOCK</button>
+            <button id="saveNameBtn" class="confirm-name-btn" onclick="saveFileName()">SAVE</button>
         </div>
         
         <button id="exportBtn" class="start-btn" onclick="exportKML()">DOWNLOAD KML FILE</button>
@@ -109,6 +107,7 @@
 </div>
 
 <script>
+    /* GPS Logic and Initialization same as v3.56 */
     let totalDist = 0, partialDist = 0, accumulatedTime = 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
@@ -133,7 +132,6 @@
         accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
         accEl.style.background = accuracy < 15 ? "#34a853" : "#ea4335";
         document.getElementById('currSpeed').innerText = Math.round(curSpeed);
-
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false; speak("Now you can go!");
             document.getElementById('totalArea').classList.add('go-flash');
@@ -142,9 +140,7 @@
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
             mark('start'); return;
         }
-
         if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
-
         if (curSpeed < 1.0) {
             resumeStrikeStartTime = null;
             if (!isAutoPaused && !stopTimeStart) stopTimeStart = Date.now();
@@ -163,16 +159,13 @@
                 }
             }
         }
-
         if (isAutoPaused || !lastCoords) return;
-
         const d = (function(l1, lo1, l2, lo2) {
             const R = 6371;
             const dLat = (l2-l1)*Math.PI/180, dLon = (lo2-lo1)*Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         })(lastCoords.lat, lastCoords.lon, latitude, longitude);
-
         if (d > 0.002) {
             totalDist += d; partialDist += d;
             document.getElementById('total').innerText = totalDist.toFixed(2);
@@ -220,10 +213,11 @@
             const count = waypoints.filter(w => w.type === 's' || w.type === 'rp' || w.type === 'nos').length;
             document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
             document.getElementById('reportModal').style.display = 'flex';
-            // v3.56 Auto-Focus and Reset Input
             setTimeout(() => { 
                 const input = document.getElementById('stageName');
                 input.value = ""; input.classList.remove('locked');
+                const saveBtn = document.getElementById('saveNameBtn');
+                saveBtn.style.background = "#bf953f"; saveBtn.innerText = "SAVE";
                 document.getElementById('exportBtn').style.opacity = "0.4";
                 document.getElementById('exportBtn').style.pointerEvents = "none";
                 input.focus(); 
@@ -231,13 +225,16 @@
         }
     }
 
-    function lockFileName() {
+    function saveFileName() {
         const input = document.getElementById('stageName');
+        const saveBtn = document.getElementById('saveNameBtn');
         if(input.value.trim() === "") input.value = "StageMaster_SS";
         input.classList.add('locked');
+        saveBtn.style.background = "#34a853";
+        saveBtn.innerText = "OK";
         document.getElementById('exportBtn').style.opacity = "1";
         document.getElementById('exportBtn').style.pointerEvents = "auto";
-        speak("Name Locked");
+        setTimeout(() => speak("Stage name saved"), 100);
     }
 
     function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready"); }
