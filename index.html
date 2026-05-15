@@ -71,7 +71,7 @@
         </button>
         <button class="wp-btn" id="btn-nos" style="border-color: #1a73e8; color: #1a73e8;">
             <div class="progress-fill"></div>
-            <img src="https://i.postimg.cc/mD8x8838/blue-pin.png"> 
+            <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/blue%20pin.png"> 
             <div class="wp-label">NO S</div>
         </button>
         <button class="wp-btn" id="btn-marshal" style="border-color: #e67e22; color: #e67e22;">
@@ -104,7 +104,7 @@
         finish: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Flying-flag.png',
         s: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png',
         rp: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png',
-        nos: 'https://i.postimg.cc/mD8x8838/blue-pin.png' // Blue Pin Icon
+        nos: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/blue%20pin.png'
     };
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
@@ -231,7 +231,7 @@
                 if (progress >= 100) {
                     clearInterval(timer); fill.style.height = '0%';
                     mark(type);
-                    partialDist = 0; document.getElementById('partial').innerText = "0.00"; 
+                    partialDist = 0; document.getElementById('partial').innerText = "0.00";
                 }
             }, 40); 
         });
@@ -247,7 +247,7 @@
         let n = "", s = "", iconKey = "";
         const dist = totalDist.toFixed(2);
         if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
-        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = "nos"; } // Corrected to blue pin key
+        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = "nos"; }
         else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
         else if (type === 'marshal') { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
         waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${dist}KM`, type: iconKey });
