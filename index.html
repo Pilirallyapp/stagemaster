@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.61 Navigator</title>
+    <title>StageMaster 3.63 Navigator</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -17,8 +17,11 @@
         .metric { margin: 8px 0; padding: 10px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         .total-box { border-left: 6px solid #ea4335; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; }
-        .go-flash { animation: flashing-green 0.5s infinite; }
-        @keyframes flashing-green { 0% { background: #3d3d3d; } 50% { background: #34a853; } 100% { background: #3d3d3d; } }
+        
+        /* v3.63 Off-Track Flashing */
+        .off-track-flash { animation: flash-red-speed 0.5s infinite; }
+        @keyframes flash-red-speed { 0% { color: #fbbc05; } 50% { color: #ea4335; } 100% { color: #fbbc05; } }
+
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; }
         .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; }
         
@@ -29,7 +32,6 @@
         
         .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; width: 100%; }
         .wp-btn { height: 110px; background: #1a1a1a; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: none; }
-        
         .progress-ring { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: conic-gradient(transparent 0deg, #444 0deg); z-index: 1; }
         .wp-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; background: #1a1a1a; border-radius: 50%; z-index: 2; }
         .wp-btn img { width: 65px; height: 65px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
@@ -37,12 +39,8 @@
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
-        
         .stage-input-group { display: flex; gap: 5px; margin: 15px 0; }
         .stage-input { flex-grow: 1; padding: 12px; background: #1a1a1a; border: 2px solid #bf953f; border-radius: 10px; color: white; font-size: 1rem; text-align: center; }
-        .stage-input.locked { border-color: #34a853; background: #1b2e1f; }
-        .confirm-name-btn { background: #bf953f; color: black; padding: 0 15px; border-radius: 10px; font-size: 0.8rem; transition: background 0.3s; }
-        #exportBtn { opacity: 0.4; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -74,6 +72,7 @@
     <div class="metric partial-box">
         <div class="label" id="partialLabel">Partial KM</div>
         <div id="partial" class="value">0.00</div>
+        <div id="wpTargetDisplay" style="font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-top: 5px; display: none;">TARGET: ---</div>
     </div>
 
     <button id="toggleBtn" class="start-btn">START TRACKING</button>
@@ -103,7 +102,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.61</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.63</div>
 </div>
 
 <div id="reportModal">
@@ -125,6 +124,12 @@
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
     let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
     let currentMode = 'REC';
+    
+    // v3.63 Navigation State
+    let navWaypoints = [];
+    let navPathCoords = [];
+    let activeWpIndex = 0;
+    let lastOffTrackWarning = 0;
 
     const ICONS = {
         start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
@@ -145,36 +150,124 @@
         document.getElementById('recorderToolbar').style.display = (mode === 'REC') ? 'grid' : 'none';
         document.getElementById('navControls').style.display = (mode === 'NAV') ? 'block' : 'none';
         document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Dist to Next WP' : 'Partial KM';
+        document.getElementById('wpTargetDisplay').style.display = (mode === 'NAV') ? 'block' : 'none';
         document.getElementById('resetPartialBtn').style.display = (mode === 'REC') ? 'block' : 'none';
+        
+        const mainBtn = document.getElementById('toggleBtn');
+        if (mode === 'NAV') {
+            mainBtn.innerText = "START NAVIGATION";
+        } else {
+            mainBtn.innerText = "START TRACKING";
+        }
         speak(mode === 'REC' ? "Recording mode" : "Navigation mode");
     }
 
     function startImport(event) {
         const file = event.target.files[0];
-        if (file) {
-            const btn = document.getElementById('importBtn');
-            btn.style.backgroundColor = "#34a853";
-            btn.innerText = "FILE LOADED";
-            speak("File loaded. Ah-eck ready to navigate.");
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+            navWaypoints = [];
+            navPathCoords = [];
+
+            // Waypoints
+            const placemarks = xmlDoc.getElementsByTagName("Placemark");
+            for (let i = 0; i < placemarks.length; i++) {
+                const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "WP " + i;
+                const point = placemarks[i].getElementsByTagName("Point")[0];
+                if (point) {
+                    const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
+                    navWaypoints.push({ name: name, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
+                }
+            }
+
+            // Path Line for Off-Track check
+            const line = xmlDoc.getElementsByTagName("LineString")[0];
+            if (line) {
+                const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                pts.forEach(p => {
+                    const c = p.split(",");
+                    navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                });
+            }
+
+            document.getElementById('importBtn').style.backgroundColor = "#34a853";
+            document.getElementById('importBtn').innerText = "LOADED: " + navWaypoints.length + " WP";
+            activeWpIndex = 0;
+            updateTargetDisplay();
+            speak("File parsed. Found " + navWaypoints.length + " way points.");
+        };
+        reader.readAsText(file);
+    }
+
+    function updateTargetDisplay() {
+        if (navWaypoints[activeWpIndex]) {
+            document.getElementById('wpTargetDisplay').innerText = "TARGET: " + navWaypoints[activeWpIndex].name;
         }
     }
 
-    /* GPS and tracking logic (same as v3.57/3.60) */
+    function calculateHaverDist(l1, lo1, l2, lo2) {
+        const R = 6371;
+        const dLat = (l2-l1)*Math.PI/180, dLon = (lo2-lo1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         const curSpeed = speed ? speed * 3.6 : 0;
+        const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
+        
         accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
         accEl.style.background = accuracy < 15 ? "#34a853" : "#ea4335";
-        document.getElementById('currSpeed').innerText = Math.round(curSpeed);
+        currSpeedEl.innerText = Math.round(curSpeed);
+
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false; speak("Now you can go!");
             document.getElementById('totalArea').classList.add('go-flash');
             setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
             sessionStartTime = Date.now(); startTimer();
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-            mark('start'); return;
+            if (currentMode === 'REC') mark('start');
+            return;
         }
+
+        // v3.63 Navigation Math
+        if (currentMode === 'NAV' && navWaypoints.length > 0) {
+            // 1. Distance to current Waypoint
+            const target = navWaypoints[activeWpIndex];
+            if (target) {
+                const distToWp = calculateHaverDist(latitude, longitude, target.lat, target.lon);
+                document.getElementById('partial').innerText = distToWp.toFixed(2);
+                if (distToWp < 0.02) { // 20 meters threshold
+                    speak("Arrived at " + target.name);
+                    activeWpIndex++;
+                    updateTargetDisplay();
+                }
+            }
+
+            // 2. Off-Track Check (80 meters)
+            if (navPathCoords.length > 0) {
+                let minPathDist = 999;
+                for (let pt of navPathCoords) {
+                    let d = calculateHaverDist(latitude, longitude, pt.lat, pt.lon);
+                    if (d < minPathDist) minPathDist = d;
+                }
+                if (minPathDist > 0.08) { // 0.08 KM = 80 Meters
+                    currSpeedEl.classList.add('off-track-flash');
+                    if (Date.now() - lastOffTrackWarning > 10000) {
+                        speak("You are off course, return back");
+                        lastOffTrackWarning = Date.now();
+                    }
+                } else {
+                    currSpeedEl.classList.remove('off-track-flash');
+                }
+            }
+        }
+
         if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
         if (curSpeed < 1.0) {
             resumeStrikeStartTime = null;
@@ -194,17 +287,15 @@
                 }
             }
         }
+
         if (isAutoPaused || !lastCoords) return;
-        const d = (function(l1, lo1, l2, lo2) {
-            const R = 6371;
-            const dLat = (l2-l1)*Math.PI/180, dLon = (lo2-lo1)*Math.PI/180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        })(lastCoords.lat, lastCoords.lon, latitude, longitude);
+        const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
         if (d > 0.002) {
             totalDist += d; partialDist += d;
-            document.getElementById('total').innerText = totalDist.toFixed(2);
-            document.getElementById('partial').innerText = partialDist.toFixed(2);
+            if (currentMode === 'REC') {
+                document.getElementById('total').innerText = totalDist.toFixed(2);
+                document.getElementById('partial').innerText = partialDist.toFixed(2);
+            }
             const ms = accumulatedTime + (Date.now() - sessionStartTime);
             document.getElementById('speed').innerText = (totalDist / (ms / 3600000)).toFixed(1);
             trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
@@ -223,10 +314,11 @@
 
     const mainBtn = document.getElementById('toggleBtn');
     mainBtn.addEventListener('touchstart', (e) => {
-        if (mainBtn.innerText === "START TRACKING" || mainBtn.innerText === "RESUME") {
+        if (mainBtn.innerText.includes("START") || mainBtn.innerText === "RESUME") {
             isWaitingForAccuracy = true; requestWakeLock();
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
             mainBtn.innerText = "STOP"; mainBtn.className = "stop-btn";
+            mainBtn.style.background = "#ea4335";
         } else {
             e.preventDefault();
             let p = 0;
@@ -242,37 +334,28 @@
         if (!isAutoPaused && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
         clearInterval(timerInterval); navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false;
-        mainBtn.innerText = "RESUME"; mainBtn.className = "start-btn";
+        mainBtn.innerText = (currentMode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
+        mainBtn.className = "start-btn"; mainBtn.style.background = "#34a853";
         speak("Measurement Paused"); releaseWakeLock();
-        if (showModal) {
+        if (showModal && currentMode === 'REC') {
             const count = waypoints.filter(w => w.type === 's' || w.type === 'rp' || w.type === 'nos').length;
             document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
             document.getElementById('reportModal').style.display = 'flex';
-            setTimeout(() => { 
-                const input = document.getElementById('stageName');
-                input.value = ""; input.classList.remove('locked');
-                const saveBtn = document.getElementById('saveNameBtn');
-                saveBtn.style.background = "#bf953f"; saveBtn.innerText = "SAVE";
-                document.getElementById('exportBtn').style.opacity = "0.4";
-                document.getElementById('exportBtn').style.pointerEvents = "none";
-                input.focus(); 
-            }, 200);
+            setTimeout(() => { document.getElementById('stageName').focus(); }, 200);
         }
     }
 
     function saveFileName() {
         const input = document.getElementById('stageName');
         const saveBtn = document.getElementById('saveNameBtn');
-        if(input.value.trim() === "") input.value = "StageMaster_SS";
         input.classList.add('locked');
-        saveBtn.style.background = "#34a853";
-        saveBtn.innerText = "OK";
+        saveBtn.style.background = "#34a853"; saveBtn.innerText = "OK";
         document.getElementById('exportBtn').style.opacity = "1";
         document.getElementById('exportBtn').style.pointerEvents = "auto";
-        setTimeout(() => speak("Stage name saved"), 100);
+        speak("Stage name saved");
     }
 
-    function closeModal() { document.getElementById('reportModal').style.display = 'none'; speak("Ready"); }
+    function closeModal() { document.getElementById('reportModal').style.display = 'none'; }
 
     const pBtn = document.getElementById('resetPartialBtn');
     pBtn.onclick = () => { partialDist = 0; document.getElementById('partial').innerText = "0.00"; speak("Partial Reset"); };
@@ -333,7 +416,7 @@
     });
 
     function exportKML() {
-        const fileName = document.getElementById('stageName').value;
+        const fileName = document.getElementById('stageName').value || "StageMaster_SS";
         let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${fileName}</name>`;
         Object.keys(ICONS).forEach(key => {
             kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>2.5</scale></IconStyle></Style>`;
