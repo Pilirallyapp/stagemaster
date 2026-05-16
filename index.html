@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.68</title>
+    <title>StageMaster 4.00</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.68</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.00</div>
 </div>
 
 <div id="reportModal">
@@ -147,8 +147,8 @@
 
     function formatWpName(name) {
         let clean = name.split('|')[0].trim();
-        if (clean.startsWith('RP')) return clean.replace('RP', 'Radio Point ');
-        if (clean.startsWith('S')) return clean.replace('S', 'S ');
+        if (clean.toUpperCase().startsWith('RP')) return clean.replace(/RP/i, 'Radio Point ');
+        if (clean.toUpperCase().startsWith('S')) return clean.replace(/S/i, 'S ');
         return clean;
     }
 
@@ -188,10 +188,19 @@
             for (let i = 0; i < placemarks.length; i++) {
                 const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
                 
+                // Extract KML Extended description strings safely
+                const descNode = placemarks[i].getElementsByTagName("description")[0];
+                const description = descNode ? descNode.textContent.trim() : "";
+                
                 const point = placemarks[i].getElementsByTagName("Point")[0];
                 if (point) {
                     const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
-                    navWaypoints.push({ name: name, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
+                    navWaypoints.push({ 
+                        name: name, 
+                        desc: description, 
+                        lon: parseFloat(coords[0]), 
+                        lat: parseFloat(coords[1]) 
+                    });
                 }
 
                 const line = placemarks[i].getElementsByTagName("LineString")[0];
@@ -296,7 +305,8 @@
             const startPoint = navWaypoints[0];
             const finishPoint = navWaypoints[navWaypoints.length - 1];
 
-            if (!navStarted && calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon) < 0.003) {
+            // Sequence Start checking both standard start coordinates or names containing "Start"
+            if (!navStarted && (calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon) < 0.003 || startPoint.name.toUpperCase().includes("START"))) {
                 navStarted = true;
                 sessionStartTime = Date.now();
                 startTimer();
@@ -318,7 +328,9 @@
                     
                     const distM = distToWp * 1000;
                     const cleanName = formatWpName(target.name);
+                    const tulipNote = target.desc ? `, ${target.desc}` : "";
 
+                    // 2km & 1km: Purely announce standard waypoint tracking names
                     if (distM <= 2000 && distM > 1950 && !wpMarkersHit.p2km) {
                         speak("Approaching " + cleanName + " in 2 kilometers");
                         wpMarkersHit.p2km = true;
@@ -327,21 +339,33 @@
                         speak("Approaching " + cleanName + " in 1 kilometer");
                         wpMarkersHit.p1km = true;
                     }
+                    // 500m Gate: Distance + Custom Tulip script block
                     if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) {
-                        speak("500 meters");
+                        speak("500 meters" + tulipNote);
                         wpMarkersHit.p500 = true;
                     }
+                    // 150m Gate: Target tracking name + Distance context + Tulip script block
                     if (distM <= 150 && distM > 140 && !wpMarkersHit.p150) {
-                        speak("Approaching " + cleanName + " in 150 meters");
+                        speak("Approaching " + cleanName + " in 150 meters" + tulipNote);
                         wpMarkersHit.p150 = true;
                     }
+                    // 50m Gate: Tactical braking silent channel protection
                     if (distM <= 50 && distM > 40 && !wpMarkersHit.p50) {
                         speak("50 meters");
                         wpMarkersHit.p50 = true;
                     }
                     
                     if (distM <= 20) {
-                        speak("Arrived at " + cleanName);
+                        // Arrival Absolute Verification Gate: Arrived text + full tracking note
+                        speak("Arrived at " + cleanName + tulipNote);
+                        
+                        // Check if upcoming trigger array hits our updated "Flying" check rule
+                        if (target.name.toUpperCase().includes("FLYING")) {
+                            handleStop(false);
+                            speak("Special Stage Finished");
+                            return;
+                        }
+
                         activeWpIndex++;
                         
                         wpMarkersHit.p2km = false;
