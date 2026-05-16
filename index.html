@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 3.67 Pro Navigator</title>
+    <title>StageMaster 3.67 FIX</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.67</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 3.67 FIX</div>
 </div>
 
 <div id="reportModal">
@@ -181,20 +181,39 @@
             const placemarks = xmlDoc.getElementsByTagName("Placemark");
             for (let i = 0; i < placemarks.length; i++) {
                 const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
+                
+                // Strict Geometric Validation: Check if it's an actual Point marker
                 const point = placemarks[i].getElementsByTagName("Point")[0];
-                if (point && !name.includes("Path")) {
+                if (point) {
                     const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
                     navWaypoints.push({ name: name, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
                 }
+
+                // Strict Geometric Validation: Check if it's a structural LineString path
+                const line = placemarks[i].getElementsByTagName("LineString")[0];
+                if (line) {
+                    const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                    pts.forEach(p => {
+                        if (p.trim()) {
+                            const c = p.split(",");
+                            navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                        }
+                    });
+                }
             }
 
-            const line = xmlDoc.getElementsByTagName("LineString")[0];
-            if (line) {
-                const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
-                pts.forEach(p => {
-                    const c = p.split(",");
-                    navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
-                });
+            // Fallback for flat LineStrings outside Placemarks
+            if (navPathCoords.length === 0) {
+                const globalLines = xmlDoc.getElementsByTagName("LineString");
+                for (let j = 0; j < globalLines.length; j++) {
+                    const pts = globalLines[j].getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                    pts.forEach(p => {
+                        if (p.trim()) {
+                            const c = p.split(",");
+                            navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                        }
+                    });
+                }
             }
 
             document.getElementById('importBtn').style.backgroundColor = "#34a853";
