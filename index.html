@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.10</title>
+    <title>StageMaster 4.11</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.10</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.11</div>
 </div>
 
 <div id="reportModal">
@@ -133,6 +133,9 @@
     let wpMarkersHit = { p2km: false, p1km: false, p500: false, p150: false, p50: false };
     let accuracyAchieved = false;
     let isManualPaused = false;
+    
+    // Global UI control variable established before any system functions execute
+    let mainBtn = null; 
 
     const ICONS = {
         start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
@@ -166,6 +169,7 @@
     }
 
     function checkStateRecovery() {
+        mainBtn = document.getElementById('toggleBtn'); 
         const vaultData = localStorage.getItem('stagemaster_vault');
         if (!vaultData) return;
         try {
@@ -202,7 +206,6 @@
                 updateTargetDisplay();
             }
 
-            const mainBtn = document.getElementById('toggleBtn');
             if (isManualPaused || (!watchId && navStarted)) {
                 mainBtn.innerText = "RESUME";
                 mainBtn.className = "start-btn";
@@ -235,8 +238,8 @@
         document.getElementById('resetPartialBtn').style.display = (mode === 'REC') ? 'block' : 'none';
         document.getElementById('totalLabel').innerText = (mode === 'NAV') ? 'Distance to Finish' : 'Total (HOLD 3S TO RESET)';
         
-        const mainBtn = document.getElementById('toggleBtn');
-        if (!isManualPaused && !watchId) {
+        mainBtn = document.getElementById('toggleBtn');
+        if (mainBtn && !isManualPaused && !watchId) {
             mainBtn.innerText = (mode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
             mainBtn.className = "start-btn";
             mainBtn.style.background = "#34a853";
@@ -540,4 +543,190 @@
                 document.getElementById('partial').innerText = partialDist.toFixed(2);
             }
             if (navStarted || currentMode === 'REC') {
-                const
+                const elapsed = accumulatedTime + (Date.now() - sessionStartTime);
+                document.getElementById('speed').innerText = ( (currentMode === 'REC' ? totalDist : totalDist) / (elapsed / 3600000)).toFixed(1);
+            }
+            trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
+            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+            saveStateToVault();
+        }
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            const ms = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+            const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
+            document.getElementById('timer').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }, 1000);
+    }
+
+    // Global variable binding initialized instantly for event management
+    mainBtn = document.getElementById('toggleBtn'); 
+    mainBtn.addEventListener('touchstart', (e) => {
+        if (mainBtn.innerText.includes("START") || mainBtn.innerText === "RESUME") {
+            isWaitingForAccuracy = true; 
+            accuracyAchieved = false;
+            isManualPaused = false;
+            requestWakeLock();
+            watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
+            mainBtn.innerText = "PAUSE"; mainBtn.className = "stop-btn";
+            mainBtn.style.background = "#ea4335";
+            speak("Waiting for GPS accuracy");
+            saveStateToVault();
+        } else {
+            e.preventDefault();
+            let p = 0;
+            let itv = setInterval(() => {
+                p += 2; mainBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
+                if (p >= 100) { 
+                    clearInterval(itv); 
+                    handlePause(); 
+                    mainBtn.style.background = "#34a853"; 
+                }
+            }, 60);
+            mainBtn.addEventListener('touchend', () => { 
+                clearInterval(itv); 
+                mainBtn.style.background = "#ea4335"; 
+                if(p<100) handlePause(); 
+            }, {once:true});
+        }
+    });
+
+    function handlePause() {
+        speak("PAUSING NAVIGATION");
+        isManualPaused = true;
+        if (sessionStartTime) {
+            accumulatedTime += (Date.now() - sessionStartTime);
+            sessionStartTime = null;
+        }
+        clearInterval(timerInterval);
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        accuracyAchieved = false;
+        
+        mainBtn.innerText = "RESUME";
+        mainBtn.className = "start-btn";
+        mainBtn.style.background = "#34a853";
+        document.body.classList.remove('panic-mode');
+        releaseWakeLock();
+        saveStateToVault();
+    }
+
+    function handleResetAndStop(showModal) {
+        if (sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
+        clearInterval(timerInterval); 
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        watchId = null; isAutoPaused = false; navStarted = false; accuracyAchieved = false; isManualPaused = false;
+        mainBtn.innerText = (currentMode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
+        mainBtn.className = "start-btn"; mainBtn.style.background = "#34a853";
+        document.body.classList.remove('panic-mode');
+        releaseWakeLock();
+        clearVault();
+        if (showModal && currentMode === 'REC') {
+            const count = waypoints.filter(w => w.type === 's' || w.type === 'rp' || w.type === 'nos').length;
+            document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
+            document.getElementById('reportModal').style.display = 'flex';
+            setTimeout(() => { document.getElementById('stageName').focus(); }, 200);
+        }
+    }
+
+    function saveFileName() {
+        const input = document.getElementById('stageName');
+        const saveBtn = document.getElementById('saveNameBtn');
+        input.classList.add('locked');
+        saveBtn.style.background = "#34a853"; saveBtn.innerText = "OK";
+        document.getElementById('exportBtn').style.opacity = "1";
+        document.getElementById('exportBtn').style.pointerEvents = "auto";
+        speak("Stage name saved");
+    }
+
+    function closeModal() { 
+        document.getElementById('reportModal').style.display = 'none'; 
+        handleResetAndStop(false);
+    }
+
+    const pBtn = document.getElementById('resetPartialBtn');
+    pBtn.onclick = () => { partialDist = 0; document.getElementById('partial').innerText = "0.00"; speak("Partial Reset"); saveStateToVault(); };
+
+    function setupWaypointBtn(id, ringId, color, type) {
+        const btn = document.getElementById(id);
+        const ring = document.getElementById(ringId);
+        let timer;
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            let deg = 0;
+            timer = setInterval(() => {
+                deg += 7.2;
+                ring.style.background = `conic-gradient(${color} ${deg}deg, #444 ${deg}deg)`;
+                if (deg >= 360) {
+                    clearInterval(timer);
+                    ring.style.background = `conic-gradient(transparent 0deg, #444 0deg)`;
+                    mark(type);
+                    partialDist = 0; document.getElementById('partial').innerText = "0.00"; 
+                }
+            }, 40); 
+        });
+        btn.addEventListener('touchend', () => { clearInterval(timer); ring.style.background = `conic-gradient(transparent 0deg, #444 0deg)`; });
+    }
+
+    setupWaypointBtn('btn-rp', 'ring-rp', '#fbbc05', 'double');
+    setupWaypointBtn('btn-nos', 'ring-nos', '#1a73e8', 'long');
+    setupWaypointBtn('btn-marshal', 'ring-marshal', '#e67e22', 'marshal');
+
+    function mark(type) {
+        if (!lastCoords) return;
+        let n = "", s = "", iconKey = "";
+        const dist = totalDist.toFixed(2);
+        if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
+        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = "nos"; }
+        else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
+        else if (type === 'marshal') { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
+        waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${dist}KM`, type: iconKey });
+        saveStateToVault();
+        if(s) speak(s);
+    }
+
+    const totalArea = document.getElementById('totalArea');
+    totalArea.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        let p = 0;
+        let itv = setInterval(() => {
+            p += 2; totalArea.style.background = `linear-gradient(to bottom, white ${p}%, #3d3d3d ${p}%)`;
+            if (p >= 100) {
+                clearInterval(itv); totalArea.style.background = "#3d3d3d";
+                totalDist = 0; partialDist = 0; accumulatedTime = 0;
+                trackPoints = []; waypoints = []; globalWpCounter = 1;
+                document.getElementById('total').innerText = "0.00";
+                document.getElementById('partial').innerText = "0.00";
+                document.getElementById('timer').innerText = "00:00:00";
+                clearVault();
+                speak("TOTAL KILOMETERS AND TIMER RESET");
+            }
+        }, 60);
+        totalArea.addEventListener('touchend', () => { clearInterval(itv); totalArea.style.background = "#3d3d3d"; }, {once:true});
+    });
+
+    function exportKML() {
+        const fileName = document.getElementById('stageName').value || "StageMaster_SS";
+        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${fileName}</name>`;
+        Object.keys(ICONS).forEach(key => {
+            kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>2.5</scale></IconStyle></Style>`;
+        });
+        waypoints.forEach(wp => {
+            let style = wp.type ? `<styleUrl>#${wp.type}Icon</styleUrl>` : '';
+            kml += `<Placemark><name>${wp.name}</name>${style}<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point></Placemark>`;
+        });
+        if (trackPoints.length > 0) {
+            const last = trackPoints[trackPoints.length - 1];
+            kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
+        }
+        kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
+        trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
+        kml += `</coordinates></LineString></Placemark></Document></kml>`;
+        clearVault();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
+    }
+</script>
+</body>
+</html>
