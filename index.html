@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.12</title>
+    <title>StageMaster 4.20</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.12</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.20</div>
 </div>
 
 <div id="reportModal">
@@ -134,8 +134,9 @@
     let accuracyAchieved = false;
     let isManualPaused = false;
     
-    // Recovery breadcrumb parameters for off-track situations
     let offTrackAnchor = null; 
+    let isWrongWay = false;
+    let wrongWayInterval = null;
     let mainBtn = null; 
 
     const ICONS = {
@@ -164,7 +165,7 @@
             globalWpCounter, trackPoints, waypoints,
             navWaypoints, navPathCoords, wpMarkersHit,
             isManualPaused, isAutoPaused, accuracyAchieved,
-            isOffTrack, offTrackAnchor,
+            isOffTrack, offTrackAnchor, isWrongWay,
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -196,6 +197,7 @@
             accuracyAchieved = state.accuracyAchieved || false;
             isOffTrack = state.isOffTrack || false;
             offTrackAnchor = state.offTrackAnchor || null;
+            isWrongWay = state.isWrongWay || false;
 
             switchMode(state.currentMode || 'REC');
 
@@ -227,7 +229,10 @@
                 mainBtn.style.background = "#ea4335";
                 startTimer();
             }
-            if (isOffTrack) document.body.classList.add('panic-mode');
+            
+            if (isOffTrack || isWrongWay) document.body.classList.add('panic-mode');
+            if (isWrongWay) triggerWrongWayAudioLoop();
+            
             speak("Session recovered from memory vault.");
         } catch(e) {
             localStorage.removeItem('stagemaster_vault');
@@ -250,6 +255,8 @@
         
         if (mode === 'NAV' && isOffTrack) {
             document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
+        } else if (mode === 'NAV' && isWrongWay) {
+            document.getElementById('partialLabel').innerText = "WRONG WAY!";
         } else {
             document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Distance to WP' : 'Partial KM';
         }
@@ -331,6 +338,7 @@
             isManualPaused = false;
             isOffTrack = false;
             offTrackAnchor = null;
+            stopWrongWayAudioLoop();
             document.body.classList.remove('panic-mode');
             updateTargetDisplay();
             saveStateToVault();
@@ -387,6 +395,31 @@
         return total;
     }
 
+    function triggerWrongWayAudioLoop() {
+        if (wrongWayInterval) return;
+        const alertPhrase = "WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY";
+        speak(alertPhrase);
+        wrongWayInterval = setInterval(() => {
+            speak(alertPhrase);
+        }, 2000); 
+    }
+
+    function stopWrongWayAudioLoop() {
+        if (wrongWayInterval) {
+            clearInterval(wrongWayInterval);
+            wrongWayInterval = null;
+        }
+        isWrongWay = false;
+    }
+
+    function announceCorrectDirectionDouble() {
+        const clearPhrase = "CORRECT DIRECTION. GO!";
+        speak(clearPhrase);
+        setTimeout(() => {
+            speak(clearPhrase);
+        }, 1200); // Clean 1.2-second pause interval between confirmations
+    }
+
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         const curSpeed = speed ? speed * 3.6 : 0;
@@ -436,48 +469,81 @@
             }
 
             if (navStarted) {
-                // Total distance calculation engine remains completely unaltered along the track line array
                 let currentPathIdx = findClosestPathIndex(latitude, longitude);
                 let finishPathIdx = navPathCoords.length - 1;
                 let trackDistanceToFinish = calculateDistanceAlongPath(currentPathIdx, finishPathIdx);
                 document.getElementById('total').innerText = trackDistanceToFinish.toFixed(2);
 
-                if (navPathCoords.length > 0) {
-                    let minPathDist = 999;
-                    for (let pt of navPathCoords) {
-                        let d = calculateHaverDist(latitude, longitude, pt.lat, pt.lon);
-                        if (d < minPathDist) minPathDist = d;
-                    }
-                    
-                    if (minPathDist > 0.08) { 
-                        if (!isOffTrack) { 
-                            isOffTrack = true; 
-                            document.body.classList.add('panic-mode'); 
-                            document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
-                            // Log departure coordinates node instantly to pin our return compass gateway
-                            offTrackAnchor = { lat: latitude, lon: longitude }; 
-                        }
-                        
-                        if (offTrackAnchor) {
-                            let distFromAnchorM = calculateHaverDist(latitude, longitude, offTrackAnchor.lat, offTrackAnchor.lon) * 1000;
-                            document.getElementById('partial').innerText = "-" + Math.round(distFromAnchorM);
-                        }
+                let minPathDist = 999;
+                for (let pt of navPathCoords) {
+                    let d = calculateHaverDist(latitude, longitude, pt.lat, pt.lon);
+                    if (d < minPathDist) minPathDist = d;
+                }
 
-                        if (Date.now() - lastOffTrackWarning > 10000) {
-                            speak("You are off course, return back");
-                            lastOffTrackWarning = Date.now();
+                // WRONG WAY AND ORIENTATION CONTROL ENGINE
+                if (minPathDist <= 0.02 && lastCoords && curSpeed >= 2.0) {
+                    let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
+                    if (currentPathIdx !== nextPathIdx) {
+                        let dyTrack = navPathCoords[nextPathIdx].lat - navPathCoords[currentPathIdx].lat;
+                        let dxTrack = navPathCoords[nextPathIdx].lon - navPathCoords[currentPathIdx].lon;
+                        let trackBearing = Math.atan2(dyTrack, dxTrack) * 180 / Math.PI;
+
+                        let dyUser = latitude - lastCoords.lat;
+                        let dxUser = longitude - lastCoords.lon;
+                        let userBearing = Math.atan2(dyUser, dxUser) * 180 / Math.PI;
+
+                        let angleDiff = Math.abs(userBearing - trackBearing);
+                        if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+                        if (angleDiff > 135) {
+                            if (!isWrongWay) {
+                                isWrongWay = true;
+                                document.body.classList.add('panic-mode');
+                                document.getElementById('partialLabel').innerText = "WRONG WAY!";
+                                triggerWrongWayAudioLoop();
+                            }
+                        } else if (isWrongWay && angleDiff < 90) {
+                            // Instant recovery shutdown sequence triggered
+                            stopWrongWayAudioLoop();
+                            if (!isOffTrack) {
+                                document.body.classList.remove('panic-mode');
+                                document.getElementById('partialLabel').innerText = "Distance to WP";
+                            }
+                            announceCorrectDirectionDouble(); // Voiced exactly twice
                         }
-                    } else if (isOffTrack && minPathDist < 0.01) { 
-                        isOffTrack = false;
-                        offTrackAnchor = null;
-                        document.body.classList.remove('panic-mode');
-                        document.getElementById('partialLabel').innerText = "Distance to WP";
-                        speak("Back on track");
                     }
                 }
 
-                // Standard waypoint proximity alerts only compute if we are strictly back inside bounds
-                if (!isOffTrack) {
+                // OFF COURSE ALARM DETECTOR
+                if (minPathDist > 0.08) { 
+                    if (!isOffTrack) { 
+                        isOffTrack = true; 
+                        document.body.classList.add('panic-mode'); 
+                        document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
+                        offTrackAnchor = { lat: latitude, lon: longitude }; 
+                    }
+                    
+                    if (offTrackAnchor) {
+                        let distFromAnchorM = calculateHaverDist(latitude, longitude, offTrackAnchor.lat, offTrackAnchor.lon) * 1000;
+                        document.getElementById('partial').innerText = "-" + Math.round(distFromAnchorM);
+                    }
+
+                    if (Date.now() - lastOffTrackWarning > 10000 && !isWrongWay) {
+                        speak("You are off course, return back");
+                        lastOffTrackWarning = Date.now();
+                    }
+                } else if (isOffTrack && minPathDist < 0.01) { 
+                    isOffTrack = false;
+                    offTrackAnchor = null;
+                    if (!isWrongWay) {
+                        document.body.classList.remove('panic-mode');
+                        document.getElementById('partialLabel').innerText = "Distance to WP";
+                    }
+                    speak("Back on track");
+                }
+
+                // STANDARD CHECKPOINT GATEWAYS
+                if (!isOffTrack && !isWrongWay) {
                     const target = navWaypoints[activeWpIndex];
                     if (target) {
                         const distToWp = calculateHaverDist(latitude, longitude, target.lat, target.lon);
@@ -640,10 +706,7 @@
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null;
         accuracyAchieved = false;
-        
-        mainBtn.innerText = "RESUME";
-        mainBtn.className = "start-btn";
-        mainBtn.style.background = "#34a853";
+        stopWrongWayAudioLoop();
         document.body.classList.remove('panic-mode');
         releaseWakeLock();
         saveStateToVault();
@@ -655,6 +718,7 @@
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false; navStarted = false; accuracyAchieved = false; isManualPaused = false;
         isOffTrack = false; offTrackAnchor = null;
+        stopWrongWayAudioLoop();
         mainBtn.innerText = (currentMode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
         mainBtn.className = "start-btn"; mainBtn.style.background = "#34a853";
         document.body.classList.remove('panic-mode');
@@ -736,6 +800,7 @@
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 trackPoints = []; waypoints = []; globalWpCounter = 1;
                 isOffTrack = false; offTrackAnchor = null;
+                stopWrongWayAudioLoop();
                 document.body.classList.remove('panic-mode');
                 document.getElementById('total').innerText = "0.00";
                 document.getElementById('partial').innerText = "0.00";
