@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.22</title>
+    <title>StageMaster 4.23</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.22</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.23</div>
 </div>
 
 <div id="reportModal">
@@ -137,7 +137,7 @@
     let offTrackAnchor = null; 
     let isWrongWay = false;
     let wrongWayInterval = null;
-    let wrongWayStrikeCount = 0; // Filter tracker for stabilization rule
+    let wrongWayStrikeCount = 0; 
     let mainBtn = null; 
 
     const ICONS = {
@@ -240,7 +240,7 @@
                 mainBtn.innerText = "PAUSE";
                 mainBtn.className = "stop-btn";
                 mainBtn.style.background = "#ea4335";
-                startTimer();
+                if (navStarted) startTimer();
             }
             
             if (isOffTrack || isWrongWay) document.body.classList.add('panic-mode');
@@ -441,9 +441,26 @@
         setTimeout(() => { speak(clearPhrase); }, 1200); 
     }
 
+    function announceBackOnTrackDouble() {
+        const recoveryPhrase = "Back on track, GO";
+        speak(recoveryPhrase);
+        setTimeout(() => { speak(recoveryPhrase); }, 2000); 
+    }
+
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
-        const curSpeed = speed ? speed * 3.6 : 0;
+        let curSpeed = speed ? speed * 3.6 : 0;
+        
+        if (lastCoords && accuracy < 20) {
+            let timeDeltaSec = (Date.now() - lastCoords.time) / 1000;
+            let spatialDeltaKM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
+            let mathematicalSpeed = timeDeltaSec > 0 ? (spatialDeltaKM / (timeDeltaSec / 3600)) : 0;
+            
+            if (mathematicalSpeed > 160 || (curSpeed === 0 && mathematicalSpeed > 6 && timeDeltaSec < 3)) {
+                return; 
+            }
+        }
+
         const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
         
@@ -475,7 +492,7 @@
                 sessionStartTime = Date.now(); 
                 startTimer();
                 mark('start');
-            } else {
+            } else if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
                 sessionStartTime = Date.now();
                 startTimer();
             }
@@ -487,12 +504,11 @@
             const startPoint = navWaypoints[0];
             const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
 
-            // Strict 5-meter geographical locking fence before permitting unlock
             if (!navStarted) {
                 document.getElementById('partial').innerText = distToStartGate.toFixed(2);
                 document.getElementById('total').innerText = "0.00";
                 
-                if (distToStartGate <= 0.005) { // Precision set to 5 meters
+                if (distToStartGate <= 0.005) { 
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
@@ -514,8 +530,7 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
-                // 1. CONFIRMED STABILIZED DIRECTION VECTOR ENGINE (3-SECOND CONFIRMATION FILTER)
-                if (minPathDist <= 0.02 && !isOffTrack && lastCoords && curSpeed >= 5.0) {
+                if (minPathDist <= 0.02 && !isOffTrack && lastCoords && curSpeed >= 2.5) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     if (currentPathIdx !== nextPathIdx) {
                         let dyTrack = navPathCoords[nextPathIdx].lat - navPathCoords[currentPathIdx].lat;
@@ -531,8 +546,7 @@
 
                         if (angleDiff > 135) {
                             wrongWayStrikeCount++;
-                            // Verify user trajectory is facing backward for 3 sequential data bursts
-                            if (wrongWayStrikeCount >= 3) {
+                            if (wrongWayStrikeCount >= 5) { // Calibration filter safely extended to 5 seconds
                                 if (!isWrongWay) {
                                     isWrongWay = true;
                                     document.body.classList.add('panic-mode');
@@ -541,7 +555,7 @@
                                 }
                             }
                         } else {
-                            wrongWayStrikeCount = 0; // Instantly clean transient glitches or corners
+                            wrongWayStrikeCount = 0; 
                             if (isWrongWay && angleDiff < 90) {
                                 stopWrongWayAudioLoop();
                                 document.body.classList.remove('panic-mode');
@@ -554,7 +568,6 @@
                     wrongWayStrikeCount = 0;
                 }
 
-                // 2. OFF COURSE ALARM DETECTOR WITH CONTINUOUS RECOVERY MATH
                 if (minPathDist > 0.08) { 
                     if (isWrongWay) stopWrongWayAudioLoop(); 
                     
@@ -564,28 +577,32 @@
                         document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
                         offTrackAnchor = { lat: latitude, lon: longitude }; 
                     }
-                    
+                }
+
+                if (isOffTrack) {
                     let accumulatedDriftM = 80;
                     if (offTrackAnchor) {
                         let distFromAnchorM = calculateHaverDist(latitude, longitude, offTrackAnchor.lat, offTrackAnchor.lon) * 1000;
                         accumulatedDriftM += distFromAnchorM;
                     }
-                    document.getElementById('partial').innerText = "-" + Math.round(accumulatedDriftM);
+                    
+                    let currentActualDistM = minPathDist * 1000;
+                    document.getElementById('partial').innerText = "-" + Math.round(currentActualDistM);
 
                     if (Date.now() - lastOffTrackWarning > 10000 && !isWrongWay) {
                         speak("You are off course, return back");
                         lastOffTrackWarning = Date.now();
                     }
-                } else if (isOffTrack && minPathDist < 0.01) { 
-                    // Dynamic return countdown tracks seamlessly down to 0 before swapping layout states
-                    isOffTrack = false;
-                    offTrackAnchor = null;
-                    document.body.classList.remove('panic-mode');
-                    document.getElementById('partialLabel').innerText = "Distance to WP";
-                    speak("Back on track");
+
+                    if (minPathDist < 0.01) { 
+                        isOffTrack = false;
+                        offTrackAnchor = null;
+                        document.body.classList.remove('panic-mode');
+                        document.getElementById('partialLabel').innerText = "Distance to WP";
+                        announceBackOnTrackDouble(); 
+                    }
                 }
 
-                // 3. SECURE AUDIO ANNOUNCEMENT PROXIMITY GATES
                 if (!isOffTrack && !isWrongWay) {
                     const target = navWaypoints[activeWpIndex];
                     if (target) {
@@ -659,12 +676,13 @@
         }
 
         if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
+        
         if (curSpeed < 1.0) {
             resumeStrikeStartTime = null;
             if (!isAutoPaused && !stopTimeStart) stopTimeStart = Date.now();
             if (!isAutoPaused && stopTimeStart && (Date.now() - stopTimeStart > 60000)) {
                 isAutoPaused = true; speak("Paused");
-                accumulatedTime += (Date.now() - sessionStartTime);
+                if (navStarted && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
                 clearInterval(timerInterval); releaseWakeLock();
                 saveStateToVault();
             }
@@ -674,7 +692,11 @@
                 if (!resumeStrikeStartTime) resumeStrikeStartTime = Date.now();
                 if (Date.now() - resumeStrikeStartTime >= 3000) {
                     isAutoPaused = false; speak("Resumed");
-                    sessionStartTime = Date.now(); startTimer(); requestWakeLock();
+                    if (navStarted) {
+                        sessionStartTime = Date.now(); 
+                        startTimer(); 
+                    }
+                    requestWakeLock();
                     saveStateToVault();
                 }
             }
@@ -683,14 +705,18 @@
         if (isAutoPaused || !lastCoords) return;
         const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
         if (d > 0.002) {
-            totalDist += d; partialDist += d;
+            if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
+                totalDist += d; partialDist += d;
+            }
             if (currentMode === 'REC') {
                 document.getElementById('total').innerText = totalDist.toFixed(2);
                 document.getElementById('partial').innerText = partialDist.toFixed(2);
             }
             if (navStarted || currentMode === 'REC') {
-                const elapsed = accumulatedTime + (Date.now() - sessionStartTime);
-                document.getElementById('speed').innerText = ( (currentMode === 'REC' ? totalDist : totalDist) / (elapsed / 3600000)).toFixed(1);
+                const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+                if (elapsed > 0) {
+                    document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
+                }
             }
             trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
