@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.20</title>
+    <title>StageMaster 4.22</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.20</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.22</div>
 </div>
 
 <div id="reportModal">
@@ -137,6 +137,7 @@
     let offTrackAnchor = null; 
     let isWrongWay = false;
     let wrongWayInterval = null;
+    let wrongWayStrikeCount = 0; // Filter tracker for stabilization rule
     let mainBtn = null; 
 
     const ICONS = {
@@ -148,8 +149,20 @@
     };
 
     function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
-    async function requestWakeLock() { try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {} }
-    function releaseWakeLock() { if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); } }
+    
+    async function requestWakeLock() { 
+        try { 
+            if ('wakeLock' in navigator) { 
+                wakeLock = await navigator.wakeLock.request('screen'); 
+            } 
+        } catch (err) {} 
+    }
+    
+    function releaseWakeLock() { 
+        if (wakeLock !== null) { 
+            wakeLock.release().then(() => { wakeLock = null; }); 
+        } 
+    }
 
     function formatWpName(name) {
         let clean = name.split('|')[0].trim();
@@ -233,6 +246,7 @@
             if (isOffTrack || isWrongWay) document.body.classList.add('panic-mode');
             if (isWrongWay) triggerWrongWayAudioLoop();
             
+            requestWakeLock();
             speak("Session recovered from memory vault.");
         } catch(e) {
             localStorage.removeItem('stagemaster_vault');
@@ -275,6 +289,7 @@
             document.getElementById('importBtn').style.backgroundColor = "#1a73e8";
             document.getElementById('importBtn').innerText = "IMPORT KML PATH";
         }
+        updateTargetDisplay();
         speak(mode === 'REC' ? "Recording mode" : "Navigation mode");
     }
 
@@ -348,11 +363,18 @@
     }
 
     function updateTargetDisplay() {
+        if (currentMode !== 'NAV') return;
+        
+        if (!navStarted && navWaypoints.length > 0) {
+            document.getElementById('wpTargetDisplay').innerText = "TARGET: START GATE";
+            return;
+        }
+
         if (navWaypoints[activeWpIndex]) {
             let name = navWaypoints[activeWpIndex].name.split('|')[0].trim();
             document.getElementById('wpTargetDisplay').innerText = "TARGET: " + name;
         }
-        if (currentMode === 'NAV' && navWaypoints.length > 0) {
+        if (navWaypoints.length > 0) {
             document.getElementById('importBtn').innerText = `COMPLETED: ${activeWpIndex} / ${navWaypoints.length}`;
         }
     }
@@ -410,14 +432,13 @@
             wrongWayInterval = null;
         }
         isWrongWay = false;
+        wrongWayStrikeCount = 0;
     }
 
     function announceCorrectDirectionDouble() {
         const clearPhrase = "CORRECT DIRECTION. GO!";
         speak(clearPhrase);
-        setTimeout(() => {
-            speak(clearPhrase);
-        }, 1200); // Clean 1.2-second pause interval between confirmations
+        setTimeout(() => { speak(clearPhrase); }, 1200); 
     }
 
     function updateStats(pos) {
@@ -429,6 +450,8 @@
         accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
         accEl.style.background = accuracy < 15 ? "#34a853" : "#ea4335";
         currSpeedEl.innerText = Math.round(curSpeed);
+        
+        if (watchId && Math.random() < 0.1) { requestWakeLock(); }
 
         if (isWaitingForAccuracy && accuracy <= 10) {
             isWaitingForAccuracy = false; 
@@ -440,7 +463,11 @@
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
             
             if (currentMode === 'NAV' && navWaypoints.length > 0) {
-                activeWpIndex = findForwardNearestWaypointIndex(latitude, longitude);
+                if (navStarted) {
+                    activeWpIndex = findForwardNearestWaypointIndex(latitude, longitude);
+                } else {
+                    activeWpIndex = 0;
+                }
                 updateTargetDisplay();
             }
 
@@ -458,14 +485,21 @@
 
         if (currentMode === 'NAV' && navWaypoints.length > 0 && accuracyAchieved) {
             const startPoint = navWaypoints[0];
+            const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
 
-            if (!navStarted && (calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon) < 0.003 || startPoint.name.toUpperCase().includes("START"))) {
-                navStarted = true;
-                sessionStartTime = Date.now();
-                startTimer();
-                speak("The special stage has started");
-                activeWpIndex = 1;
-                updateTargetDisplay();
+            // Strict 5-meter geographical locking fence before permitting unlock
+            if (!navStarted) {
+                document.getElementById('partial').innerText = distToStartGate.toFixed(2);
+                document.getElementById('total').innerText = "0.00";
+                
+                if (distToStartGate <= 0.005) { // Precision set to 5 meters
+                    navStarted = true;
+                    sessionStartTime = Date.now();
+                    startTimer();
+                    speak("The special stage has started");
+                    activeWpIndex = 1;
+                    updateTargetDisplay();
+                }
             }
 
             if (navStarted) {
@@ -480,8 +514,8 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
-                // WRONG WAY AND ORIENTATION CONTROL ENGINE
-                if (minPathDist <= 0.02 && lastCoords && curSpeed >= 2.0) {
+                // 1. CONFIRMED STABILIZED DIRECTION VECTOR ENGINE (3-SECOND CONFIRMATION FILTER)
+                if (minPathDist <= 0.02 && !isOffTrack && lastCoords && curSpeed >= 5.0) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     if (currentPathIdx !== nextPathIdx) {
                         let dyTrack = navPathCoords[nextPathIdx].lat - navPathCoords[currentPathIdx].lat;
@@ -496,26 +530,34 @@
                         if (angleDiff > 180) angleDiff = 360 - angleDiff;
 
                         if (angleDiff > 135) {
-                            if (!isWrongWay) {
-                                isWrongWay = true;
-                                document.body.classList.add('panic-mode');
-                                document.getElementById('partialLabel').innerText = "WRONG WAY!";
-                                triggerWrongWayAudioLoop();
+                            wrongWayStrikeCount++;
+                            // Verify user trajectory is facing backward for 3 sequential data bursts
+                            if (wrongWayStrikeCount >= 3) {
+                                if (!isWrongWay) {
+                                    isWrongWay = true;
+                                    document.body.classList.add('panic-mode');
+                                    document.getElementById('partialLabel').innerText = "WRONG WAY!";
+                                    triggerWrongWayAudioLoop();
+                                }
                             }
-                        } else if (isWrongWay && angleDiff < 90) {
-                            // Instant recovery shutdown sequence triggered
-                            stopWrongWayAudioLoop();
-                            if (!isOffTrack) {
+                        } else {
+                            wrongWayStrikeCount = 0; // Instantly clean transient glitches or corners
+                            if (isWrongWay && angleDiff < 90) {
+                                stopWrongWayAudioLoop();
                                 document.body.classList.remove('panic-mode');
                                 document.getElementById('partialLabel').innerText = "Distance to WP";
+                                announceCorrectDirectionDouble();
                             }
-                            announceCorrectDirectionDouble(); // Voiced exactly twice
                         }
                     }
+                } else {
+                    wrongWayStrikeCount = 0;
                 }
 
-                // OFF COURSE ALARM DETECTOR
+                // 2. OFF COURSE ALARM DETECTOR WITH CONTINUOUS RECOVERY MATH
                 if (minPathDist > 0.08) { 
+                    if (isWrongWay) stopWrongWayAudioLoop(); 
+                    
                     if (!isOffTrack) { 
                         isOffTrack = true; 
                         document.body.classList.add('panic-mode'); 
@@ -523,26 +565,27 @@
                         offTrackAnchor = { lat: latitude, lon: longitude }; 
                     }
                     
+                    let accumulatedDriftM = 80;
                     if (offTrackAnchor) {
                         let distFromAnchorM = calculateHaverDist(latitude, longitude, offTrackAnchor.lat, offTrackAnchor.lon) * 1000;
-                        document.getElementById('partial').innerText = "-" + Math.round(distFromAnchorM);
+                        accumulatedDriftM += distFromAnchorM;
                     }
+                    document.getElementById('partial').innerText = "-" + Math.round(accumulatedDriftM);
 
                     if (Date.now() - lastOffTrackWarning > 10000 && !isWrongWay) {
                         speak("You are off course, return back");
                         lastOffTrackWarning = Date.now();
                     }
                 } else if (isOffTrack && minPathDist < 0.01) { 
+                    // Dynamic return countdown tracks seamlessly down to 0 before swapping layout states
                     isOffTrack = false;
                     offTrackAnchor = null;
-                    if (!isWrongWay) {
-                        document.body.classList.remove('panic-mode');
-                        document.getElementById('partialLabel').innerText = "Distance to WP";
-                    }
+                    document.body.classList.remove('panic-mode');
+                    document.getElementById('partialLabel').innerText = "Distance to WP";
                     speak("Back on track");
                 }
 
-                // STANDARD CHECKPOINT GATEWAYS
+                // 3. SECURE AUDIO ANNOUNCEMENT PROXIMITY GATES
                 if (!isOffTrack && !isWrongWay) {
                     const target = navWaypoints[activeWpIndex];
                     if (target) {
@@ -666,11 +709,11 @@
 
     mainBtn = document.getElementById('toggleBtn'); 
     mainBtn.addEventListener('touchstart', (e) => {
+        requestWakeLock();
         if (mainBtn.innerText.includes("START") || mainBtn.innerText === "RESUME") {
             isWaitingForAccuracy = true; 
             accuracyAchieved = false;
             isManualPaused = false;
-            requestWakeLock();
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
             mainBtn.innerText = "PAUSE"; mainBtn.className = "stop-btn";
             mainBtn.style.background = "#ea4335";
