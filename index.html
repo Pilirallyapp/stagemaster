@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.11</title>
+    <title>StageMaster 4.12</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.11</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.12</div>
 </div>
 
 <div id="reportModal">
@@ -134,7 +134,8 @@
     let accuracyAchieved = false;
     let isManualPaused = false;
     
-    // Global UI control variable established before any system functions execute
+    // Recovery breadcrumb parameters for off-track situations
+    let offTrackAnchor = null; 
     let mainBtn = null; 
 
     const ICONS = {
@@ -163,6 +164,7 @@
             globalWpCounter, trackPoints, waypoints,
             navWaypoints, navPathCoords, wpMarkersHit,
             isManualPaused, isAutoPaused, accuracyAchieved,
+            isOffTrack, offTrackAnchor,
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -192,11 +194,19 @@
             isManualPaused = state.isManualPaused || false;
             isAutoPaused = state.isAutoPaused || false;
             accuracyAchieved = state.accuracyAchieved || false;
+            isOffTrack = state.isOffTrack || false;
+            offTrackAnchor = state.offTrackAnchor || null;
 
             switchMode(state.currentMode || 'REC');
 
             document.getElementById('total').innerText = totalDist.toFixed(2);
-            document.getElementById('partial').innerText = partialDist.toFixed(2);
+            
+            if (currentMode === 'NAV' && isOffTrack && offTrackAnchor) {
+                document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
+                document.getElementById('partial').innerText = "---";
+            } else {
+                document.getElementById('partial').innerText = partialDist.toFixed(2);
+            }
 
             const ms = accumulatedTime;
             const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
@@ -217,6 +227,7 @@
                 mainBtn.style.background = "#ea4335";
                 startTimer();
             }
+            if (isOffTrack) document.body.classList.add('panic-mode');
             speak("Session recovered from memory vault.");
         } catch(e) {
             localStorage.removeItem('stagemaster_vault');
@@ -233,11 +244,16 @@
         document.getElementById('modeNav').classList.toggle('active', mode === 'NAV');
         document.getElementById('recorderToolbar').style.display = (mode === 'REC') ? 'grid' : 'none';
         document.getElementById('navControls').style.display = (mode === 'NAV') ? 'block' : 'none';
-        document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Distance to WP' : 'Partial KM';
         document.getElementById('wpTargetDisplay').style.display = (mode === 'NAV') ? 'block' : 'none';
         document.getElementById('resetPartialBtn').style.display = (mode === 'REC') ? 'block' : 'none';
         document.getElementById('totalLabel').innerText = (mode === 'NAV') ? 'Distance to Finish' : 'Total (HOLD 3S TO RESET)';
         
+        if (mode === 'NAV' && isOffTrack) {
+            document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
+        } else {
+            document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Distance to WP' : 'Partial KM';
+        }
+
         mainBtn = document.getElementById('toggleBtn');
         if (mainBtn && !isManualPaused && !watchId) {
             mainBtn.innerText = (mode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
@@ -313,6 +329,9 @@
             navStarted = false;
             accuracyAchieved = false;
             isManualPaused = false;
+            isOffTrack = false;
+            offTrackAnchor = null;
+            document.body.classList.remove('panic-mode');
             updateTargetDisplay();
             saveStateToVault();
             speak(navWaypoints.length + " waypoints UPLOADED.");
@@ -417,78 +436,11 @@
             }
 
             if (navStarted) {
+                // Total distance calculation engine remains completely unaltered along the track line array
                 let currentPathIdx = findClosestPathIndex(latitude, longitude);
                 let finishPathIdx = navPathCoords.length - 1;
                 let trackDistanceToFinish = calculateDistanceAlongPath(currentPathIdx, finishPathIdx);
                 document.getElementById('total').innerText = trackDistanceToFinish.toFixed(2);
-
-                const target = navWaypoints[activeWpIndex];
-                if (target) {
-                    const distToWp = calculateHaverDist(latitude, longitude, target.lat, target.lon);
-                    document.getElementById('partial').innerText = distToWp.toFixed(2);
-                    
-                    const distM = distToWp * 1000;
-                    const cleanName = formatWpName(target.name);
-                    const tulipNote = target.desc ? `, ${target.desc}` : "";
-
-                    if (distM <= 2000 && distM > 1950 && !wpMarkersHit.p2km) {
-                        speak("Approaching " + cleanName + " in 2 kilometers");
-                        wpMarkersHit.p2km = true;
-                    }
-                    if (distM <= 1000 && distM > 950 && !wpMarkersHit.p1km) {
-                        speak("Approaching " + cleanName + " in 1 kilometer");
-                        wpMarkersHit.p1km = true;
-                    }
-                    if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) {
-                        speak("500 meters" + tulipNote);
-                        wpMarkersHit.p500 = true;
-                    }
-                    if (distM <= 150 && distM > 140 && !wpMarkersHit.p150) {
-                        speak("Approaching " + cleanName + " in 150 meters" + tulipNote);
-                        wpMarkersHit.p150 = true;
-                    }
-                    if (distM <= 50 && distM > 40 && !wpMarkersHit.p50) {
-                        speak("50 meters");
-                        wpMarkersHit.p50 = true;
-                    }
-                    
-                    if (distM <= 20) {
-                        speak("Arrived at " + cleanName + tulipNote);
-                        
-                        if (target.name.toUpperCase().includes("FLYING")) {
-                            handleResetAndStop(false);
-                            speak("Special Stage Finished");
-                            return;
-                        }
-
-                        activeWpIndex++;
-                        
-                        wpMarkersHit.p2km = false;
-                        wpMarkersHit.p1km = false;
-                        wpMarkersHit.p500 = false;
-                        wpMarkersHit.p150 = false;
-                        wpMarkersHit.p50 = false;
-                        
-                        updateTargetDisplay();
-                        
-                        if (activeWpIndex < navWaypoints.length) {
-                            setTimeout(() => {
-                                let nextTarget = navWaypoints[activeWpIndex];
-                                let nextName = formatWpName(nextTarget.name);
-                                let nextDist = calculateHaverDist(latitude, longitude, nextTarget.lat, nextTarget.lon);
-                                speak("Distance to " + nextName + " is " + nextDist.toFixed(2) + " kilometers");
-                                
-                                let nextDistM = nextDist * 1000;
-                                if (nextDistM <= 530 && nextDistM >= 450) {
-                                    wpMarkersHit.p500 = true; 
-                                }
-                                if (nextDistM <= 180 && nextDistM >= 140) {
-                                    wpMarkersHit.p150 = true;
-                                }
-                            }, 2500);
-                        }
-                    }
-                }
 
                 if (navPathCoords.length > 0) {
                     let minPathDist = 999;
@@ -498,15 +450,100 @@
                     }
                     
                     if (minPathDist > 0.08) { 
-                        if (!isOffTrack) { isOffTrack = true; document.body.classList.add('panic-mode'); }
+                        if (!isOffTrack) { 
+                            isOffTrack = true; 
+                            document.body.classList.add('panic-mode'); 
+                            document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
+                            // Log departure coordinates node instantly to pin our return compass gateway
+                            offTrackAnchor = { lat: latitude, lon: longitude }; 
+                        }
+                        
+                        if (offTrackAnchor) {
+                            let distFromAnchorM = calculateHaverDist(latitude, longitude, offTrackAnchor.lat, offTrackAnchor.lon) * 1000;
+                            document.getElementById('partial').innerText = "-" + Math.round(distFromAnchorM);
+                        }
+
                         if (Date.now() - lastOffTrackWarning > 10000) {
                             speak("You are off course, return back");
                             lastOffTrackWarning = Date.now();
                         }
                     } else if (isOffTrack && minPathDist < 0.01) { 
                         isOffTrack = false;
+                        offTrackAnchor = null;
                         document.body.classList.remove('panic-mode');
+                        document.getElementById('partialLabel').innerText = "Distance to WP";
                         speak("Back on track");
+                    }
+                }
+
+                // Standard waypoint proximity alerts only compute if we are strictly back inside bounds
+                if (!isOffTrack) {
+                    const target = navWaypoints[activeWpIndex];
+                    if (target) {
+                        const distToWp = calculateHaverDist(latitude, longitude, target.lat, target.lon);
+                        document.getElementById('partial').innerText = distToWp.toFixed(2);
+                        
+                        const distM = distToWp * 1000;
+                        const cleanName = formatWpName(target.name);
+                        const tulipNote = target.desc ? `, ${target.desc}` : "";
+
+                        if (distM <= 2000 && distM > 1950 && !wpMarkersHit.p2km) {
+                            speak("Approaching " + cleanName + " in 2 kilometers");
+                            wpMarkersHit.p2km = true;
+                        }
+                        if (distM <= 1000 && distM > 950 && !wpMarkersHit.p1km) {
+                            speak("Approaching " + cleanName + " in 1 kilometer");
+                            wpMarkersHit.p1km = true;
+                        }
+                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) {
+                            speak("500 meters" + tulipNote);
+                            wpMarkersHit.p500 = true;
+                        }
+                        if (distM <= 150 && distM > 140 && !wpMarkersHit.p150) {
+                            speak("Approaching " + cleanName + " in 150 meters" + tulipNote);
+                            wpMarkersHit.p150 = true;
+                        }
+                        if (distM <= 50 && distM > 40 && !wpMarkersHit.p50) {
+                            speak("50 meters");
+                            wpMarkersHit.p50 = true;
+                        }
+                        
+                        if (distM <= 20) {
+                            speak("Arrived at " + cleanName + tulipNote);
+                            
+                            if (target.name.toUpperCase().includes("FLYING")) {
+                                handleResetAndStop(false);
+                                speak("Special Stage Finished");
+                                return;
+                            }
+
+                            activeWpIndex++;
+                            
+                            wpMarkersHit.p2km = false;
+                            wpMarkersHit.p1km = false;
+                            wpMarkersHit.p500 = false;
+                            wpMarkersHit.p150 = false;
+                            wpMarkersHit.p50 = false;
+                            
+                            updateTargetDisplay();
+                            
+                            if (activeWpIndex < navWaypoints.length) {
+                                setTimeout(() => {
+                                    let nextTarget = navWaypoints[activeWpIndex];
+                                    let nextName = formatWpName(nextTarget.name);
+                                    let nextDist = calculateHaverDist(latitude, longitude, nextTarget.lat, nextTarget.lon);
+                                    speak("Distance to " + nextName + " is " + nextDist.toFixed(2) + " kilometers");
+                                    
+                                    let nextDistM = nextDist * 1000;
+                                    if (nextDistM <= 530 && nextDistM >= 450) {
+                                        wpMarkersHit.p500 = true; 
+                                    }
+                                    if (nextDistM <= 180 && nextDistM >= 140) {
+                                        wpMarkersHit.p150 = true;
+                                    }
+                                }, 2500);
+                            }
+                        }
                     }
                 }
             }
@@ -561,7 +598,6 @@
         }, 1000);
     }
 
-    // Global variable binding initialized instantly for event management
     mainBtn = document.getElementById('toggleBtn'); 
     mainBtn.addEventListener('touchstart', (e) => {
         if (mainBtn.innerText.includes("START") || mainBtn.innerText === "RESUME") {
@@ -618,9 +654,11 @@
         clearInterval(timerInterval); 
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null; isAutoPaused = false; navStarted = false; accuracyAchieved = false; isManualPaused = false;
+        isOffTrack = false; offTrackAnchor = null;
         mainBtn.innerText = (currentMode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
         mainBtn.className = "start-btn"; mainBtn.style.background = "#34a853";
         document.body.classList.remove('panic-mode');
+        document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
         releaseWakeLock();
         clearVault();
         if (showModal && currentMode === 'REC') {
@@ -697,9 +735,12 @@
                 clearInterval(itv); totalArea.style.background = "#3d3d3d";
                 totalDist = 0; partialDist = 0; accumulatedTime = 0;
                 trackPoints = []; waypoints = []; globalWpCounter = 1;
+                isOffTrack = false; offTrackAnchor = null;
+                document.body.classList.remove('panic-mode');
                 document.getElementById('total').innerText = "0.00";
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00";
+                document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
                 clearVault();
                 speak("TOTAL KILOMETERS AND TIMER RESET");
             }
