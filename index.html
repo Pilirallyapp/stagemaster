@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.26</title>
+    <title>StageMaster 4.28</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -74,7 +74,8 @@
         <div id="wpTargetDisplay" style="font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-top: 5px; display: none;">TARGET: ---</div>
     </div>
 
-    <button id="toggleBtn" class="start-btn">START TRACKING</button>
+    <button id="recToggleBtn" class="start-btn">START RECORDING</button>
+    <button id="navToggleBtn" class="start-btn" style="display: none;">START NAVIGATION</button>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
         <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
@@ -101,7 +102,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.26</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.28</div>
 </div>
 
 <div id="reportModal">
@@ -113,7 +114,7 @@
             <button id="saveNameBtn" class="confirm-name-btn" onclick="saveFileName()">SAVE</button>
         </div>
         <button id="exportBtn" class="start-btn" onclick="exportKML()">DOWNLOAD KML FILE</button>
-        <button class="stop-btn" style="background: #555; height: 50px; margin-top: 15px;" onclick="closeModal()">CLOSE & RESUME</button>
+        <button class="stop-btn" style="background: #555; height: 50px; margin-top: 15px;" onclick="closeModalAndResumeRecording()">CLOSE & RESUME</button>
     </div>
 </div>
 
@@ -137,9 +138,10 @@
     let offTrackAnchor = null; 
     let isWrongWay = false;
     let wrongWayInterval = null;
-    let mainBtn = null; 
+    let rBtn = null;
+    let nBtn = null;
 
-    // Advanced Absolute Displacement Model Variables (v4.26)
+    // Advanced Absolute Displacement Model Variables (v4.28)
     let upstreamAnchor = null;
     let zeroSpeedAnchor = null;
     let wasSpeedZeroTriggered = false;
@@ -191,7 +193,8 @@
     }
 
     function checkStateRecovery() {
-        mainBtn = document.getElementById('toggleBtn'); 
+        rBtn = document.getElementById('recToggleBtn');
+        nBtn = document.getElementById('navToggleBtn');
         const vaultData = localStorage.getItem('stagemaster_vault');
         if (!vaultData) return;
         try {
@@ -241,16 +244,20 @@
                 updateTargetDisplay();
             }
 
-            if (isManualPaused || (!watchId && navStarted)) {
-                mainBtn.innerText = "RESUME";
-                mainBtn.className = "start-btn";
-                mainBtn.style.background = "#34a853";
-                isManualPaused = true;
-            } else if (watchId) {
-                mainBtn.innerText = "PAUSE";
-                mainBtn.className = "stop-btn";
-                mainBtn.style.background = "#ea4335";
-                if (navStarted) startTimer();
+            if (currentMode === 'REC') {
+                if (isManualPaused) {
+                    rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
+                } else if (watchId) {
+                    rBtn.innerText = "PAUSE REC"; rBtn.className = "stop-btn"; rBtn.style.background = "#ea4335";
+                    startTimer();
+                }
+            } else if (currentMode === 'NAV') {
+                if (isManualPaused || (!watchId && navStarted)) {
+                    nBtn.innerText = "RESUME NAV"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
+                } else if (watchId) {
+                    nBtn.innerText = "PAUSE NAV"; nBtn.className = "stop-btn"; nBtn.style.background = "#ea4335";
+                    if (navStarted) startTimer();
+                }
             }
             
             if (isOffTrack || isWrongWay) document.body.classList.add('panic-mode');
@@ -277,19 +284,22 @@
         document.getElementById('resetPartialBtn').style.display = (mode === 'REC') ? 'block' : 'none';
         document.getElementById('totalLabel').innerText = (mode === 'NAV') ? 'Distance to Finish' : 'Total (HOLD 3S TO RESET)';
         
+        rBtn = document.getElementById('recToggleBtn');
+        nBtn = document.getElementById('navToggleBtn');
+        if (mode === 'REC') {
+            rBtn.style.display = "block";
+            nBtn.style.display = "none";
+        } else {
+            rBtn.style.display = "none";
+            nBtn.style.display = "block";
+        }
+
         if (mode === 'NAV' && isOffTrack) {
             document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
         } else if (mode === 'NAV' && isWrongWay) {
             document.getElementById('partialLabel').innerText = "WRONG WAY!";
         } else {
             document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Distance to WP' : 'Partial KM';
-        }
-
-        mainBtn = document.getElementById('toggleBtn');
-        if (mainBtn && !isManualPaused && !watchId) {
-            mainBtn.innerText = (mode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
-            mainBtn.className = "start-btn";
-            mainBtn.style.background = "#34a853";
         }
         
         if (mode === 'NAV' && navWaypoints.length > 0) {
@@ -368,6 +378,7 @@
             zeroSpeedAnchor = null;
             wasSpeedZeroTriggered = false;
             isAustereLoopRunning = false;
+            nBtn.innerText = "START NAVIGATION"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
             document.body.classList.remove('panic-mode');
             updateTargetDisplay();
             saveStateToVault();
@@ -561,7 +572,6 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
-                // --- ADVANCED STATE MACHINE WRONG WAY ENGINE WITH MOMENTUM DETECTORS (v4.26) ---
                 if (minPathDist <= 0.02 && !isOffTrack && lastCoords) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     let angleDiff = 0;
@@ -579,27 +589,24 @@
                         if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     }
 
-                    // DUAL TRIGGER GATE A: SPEED DROPS TO ZERO (COMPLY & MANEUVER)
                     if (curSpeed < 1.0) {
                         if (isWrongWay && !wasSpeedZeroTriggered) {
                             if (wrongWayInterval) {
                                 clearInterval(wrongWayInterval);
                                 wrongWayInterval = null;
                             }
-                            speak("WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY"); // Voice final phrase
+                            speak("WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY"); 
                             wasSpeedZeroTriggered = true;
-                            zeroSpeedAnchor = { lat: latitude, lon: longitude }; // Pin anchor baseline immediately
+                            zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
                         }
                     } else {
-                        // Vehicle is moving under speed threshold calculations
                         if (angleDiff > 135) {
-                            // DUAL TRIGGER GATE B: ENFORCING INTERACTION GATES WHILE DRIVING UPSTREAM
                             if (!isWrongWay) {
                                 if (!upstreamAnchor) {
                                     upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
                                 }
                                 let displacementM = calculateHaverDist(upstreamAnchor.lat, upstreamAnchor.lon, latitude, longitude) * 1000;
-                                if (displacementM >= 20) { // Entry validation gate
+                                if (displacementM >= 20) { 
                                     isWrongWay = true;
                                     wasSpeedZeroTriggered = false;
                                     document.body.classList.add('panic-mode');
@@ -607,31 +614,25 @@
                                     triggerWrongWayAudioLoop();
                                 }
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
-                                // Checking if team breaks zero speed hold and continues driving backward
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
                                 if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
                                     triggerAustereAudioLoop();
                                 }
                             }
                         } else if (angleDiff < 90) {
-                            // FAST HANDBRAKE ACTIVATION OR FORWARD COMPLIANCE DISPLACEMENT DETECTOR
                             upstreamAnchor = null; 
                             
                             if (isWrongWay) {
-                                // Handbrake turn or shuffle completed directionally! Kill alert lines immediately for silence space
                                 if (wrongWayInterval) {
                                     clearInterval(wrongWayInterval);
                                     wrongWayInterval = null;
                                 }
                                 wasSpeedZeroTriggered = false;
-
-                                // If they did an instant handbrake turn, zeroSpeedAnchor won't exist. Establish pivot tracker instead.
                                 if (!zeroSpeedAnchor) {
                                     zeroSpeedAnchor = { lat: latitude, lon: longitude };
                                 }
-
                                 let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
-                                if (recoveryDisplacementM >= 20) { // Symmetric 20-meter safety confirmation gate achieved
+                                if (recoveryDisplacementM >= 20) { 
                                     stopWrongWayAudioLoop();
                                     document.body.classList.remove('panic-mode');
                                     document.getElementById('partialLabel').innerText = "Distance to WP";
@@ -642,7 +643,6 @@
                     }
                 }
 
-                // --- OFF COURSE ROUTINE (ISOLATED CORRIDOR HANDOFF) ---
                 if (minPathDist > 0.08) { 
                     if (isWrongWay) stopWrongWayAudioLoop(); 
                     
@@ -672,7 +672,6 @@
                     }
                 }
 
-                // --- CHECKPOINT NOTIFICATION GATES (CORRECTED v4.26 PACING STRATEGY) ---
                 if (!isOffTrack && !isWrongWay) {
                     const target = navWaypoints[activeWpIndex];
                     if (target) {
@@ -691,15 +690,15 @@
                             speak("Approaching " + cleanName + " in 1 kilometer");
                             wpMarkersHit.p1km = true;
                         }
-                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) { // 500m fully restored
+                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) { 
                             speak("500 meters" + tulipNote);
                             wpMarkersHit.p500 = true;
                         }
-                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p150) { // Upgraded to 200 meters
+                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p150) { 
                             speak("Approaching " + cleanName + " in 200 meters" + tulipNote);
                             wpMarkersHit.p150 = true;
                         }
-                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p50) { // Upgraded to 80 meters
+                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p50) { 
                             speak("80 meters");
                             wpMarkersHit.p50 = true;
                         }
@@ -803,32 +802,89 @@
         }, 1000);
     }
 
-    mainBtn = document.getElementById('toggleBtn'); 
-    mainBtn.addEventListener('touchstart', (e) => {
+    // ==========================================
+    // BUTTON HAT 1: REC MODE CONTROL SEQUENCE
+    // ==========================================
+    rBtn = document.getElementById('recToggleBtn');
+    rBtn.addEventListener('touchstart', (e) => {
         requestWakeLock();
-        if (mainBtn.innerText.includes("START") || mainBtn.innerText === "RESUME") {
+        if (rBtn.innerText === "START RECORDING" || rBtn.innerText === "RESUME REC") {
             isWaitingForAccuracy = true; 
             accuracyAchieved = false;
             isManualPaused = false;
+            
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
-            mainBtn.innerText = "PAUSE"; mainBtn.className = "stop-btn";
-            mainBtn.style.background = "#ea4335";
+            rBtn.innerText = "PAUSE REC"; rBtn.className = "stop-btn"; rBtn.style.background = "#ea4335";
+            speak("Waiting for GPS accuracy");
+            saveStateToVault();
+        } else {
+            e.preventDefault();
+            let p = 0;
+            let wasLongPressTriggered = false;
+            
+            let itv = setInterval(() => {
+                p += 2; rBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
+                if (p >= 100) { 
+                    clearInterval(itv); 
+                    wasLongPressTriggered = true;
+                    handleOpenSummaryModal(true); // Open summary pop-up but don't wipe data yet!
+                }
+            }, 60);
+
+            rBtn.addEventListener('touchend', () => { 
+                clearInterval(itv); 
+                if (!wasLongPressTriggered) {
+                    // BRIEF TAP DETECTED: Pause recording cleanly, drop tracking
+                    rBtn.style.background = "#34a853";
+                    rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn";
+                    speak("RECORDING PAUSED");
+                    isManualPaused = true;
+                    
+                    if (sessionStartTime) {
+                        accumulatedTime += (Date.now() - sessionStartTime);
+                        sessionStartTime = null;
+                    }
+                    clearInterval(timerInterval);
+                    if (watchId) navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                    accuracyAchieved = false;
+                    lastCoords = null; 
+                    releaseWakeLock();
+                    saveStateToVault();
+                }
+            }, {once:true});
+        }
+    });
+
+    // ==========================================
+    // BUTTON HAT 2: NAV MODE CONTROL SEQUENCE
+    // ==========================================
+    nBtn = document.getElementById('navToggleBtn');
+    nBtn.addEventListener('touchstart', (e) => {
+        requestWakeLock();
+        if (nBtn.innerText === "START NAVIGATION" || nBtn.innerText === "RESUME NAV") {
+            isWaitingForAccuracy = true; 
+            accuracyAchieved = false;
+            isManualPaused = false;
+            
+            watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
+            nBtn.innerText = "PAUSE NAV"; nBtn.className = "stop-btn"; nBtn.style.background = "#ea4335";
             speak("Waiting for GPS accuracy");
             saveStateToVault();
         } else {
             e.preventDefault();
             let p = 0;
             let itv = setInterval(() => {
-                p += 2; mainBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
+                p += 2; nBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
                 if (p >= 100) { 
                     clearInterval(itv); 
                     handlePause(); 
-                    mainBtn.style.background = "#34a853"; 
+                    nBtn.style.background = "#34a853"; 
                 }
             }, 60);
-            mainBtn.addEventListener('touchend', () => { 
+            nBtn.addEventListener('touchend', () => { 
                 clearInterval(itv); 
-                mainBtn.style.background = "#ea4335"; 
+                nBtn.style.background = "#ea4335"; 
                 if(p<100) handlePause(); 
             }, {once:true});
         }
@@ -837,6 +893,7 @@
     function handlePause() {
         speak("PAUSING NAVIGATION");
         isManualPaused = true;
+        nBtn.innerText = "RESUME NAV"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
         if (sessionStartTime) {
             accumulatedTime += (Date.now() - sessionStartTime);
             sessionStartTime = null;
@@ -851,6 +908,36 @@
         saveStateToVault();
     }
 
+    // Opens the summary interface window safely without purging data lines
+    function handleOpenSummaryModal(showModal) {
+        speak("STOPPING AND PREVIEWING STAGE");
+        if (sessionStartTime) {
+            accumulatedTime += (Date.now() - sessionStartTime);
+            sessionStartTime = null;
+        }
+        clearInterval(timerInterval); 
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        watchId = null; isAutoPaused = false; accuracyAchieved = false;
+        
+        rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
+        
+        if (showModal && currentMode === 'REC') {
+            const count = waypoints.filter(w => w.type === 's' || w.type === 'rp' || w.type === 'nos').length;
+            document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
+            document.getElementById('reportModal').style.display = 'flex';
+            setTimeout(() => { document.getElementById('stageName').focus(); }, 200);
+        }
+        saveStateToVault();
+    }
+
+    function closeModalAndResumeRecording() {
+        // Safe Escape Hatch: Close pop-up window, retain data, toggle to resume state
+        document.getElementById('reportModal').style.display = 'none'; 
+        rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
+        speak("Stage summary closed. Ready to resume recording.");
+        saveStateToVault();
+    }
+
     function handleResetAndStop(showModal) {
         if (sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
         clearInterval(timerInterval); 
@@ -862,8 +949,10 @@
         zeroSpeedAnchor = null;
         wasSpeedZeroTriggered = false;
         isAustereLoopRunning = false;
-        mainBtn.innerText = (currentMode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
-        mainBtn.className = "start-btn"; mainBtn.style.background = "#34a853";
+        
+        rBtn.innerText = "START RECORDING"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
+        nBtn.innerText = "START NAVIGATION"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
+        
         document.body.classList.remove('panic-mode');
         document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
         releaseWakeLock();
@@ -977,6 +1066,15 @@
         kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
+        
+        // Purge memory loops ONLY after file is generated
+        totalDist = 0; partialDist = 0; accumulatedTime = 0;
+        trackPoints = []; waypoints = []; globalWpCounter = 1;
+        document.getElementById('total').innerText = "0.00";
+        document.getElementById('partial').innerText = "0.00";
+        document.getElementById('timer').innerText = "00:00:00";
+        rBtn.innerText = "START RECORDING"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
+        document.getElementById('reportModal').style.display = 'none';
         clearVault();
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
