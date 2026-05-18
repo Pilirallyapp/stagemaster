@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.24</title>
+    <title>StageMaster 4.25</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.24</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.25</div>
 </div>
 
 <div id="reportModal">
@@ -139,10 +139,11 @@
     let wrongWayInterval = null;
     let mainBtn = null; 
 
-    // Symmetric State Machine Parameters for Wrong Way Engine
-    let upstreamAccumulatedM = 0;
-    let downstreamAccumulatedM = 0;
+    // Advanced Absolute Displacement Model Variables (v4.25)
+    let upstreamAnchor = null;
+    let zeroSpeedAnchor = null;
     let wasSpeedZeroTriggered = false;
+    let isAustereLoopRunning = false;
 
     const ICONS = {
         start: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Start-flag.png',
@@ -183,7 +184,7 @@
             navWaypoints, navPathCoords, wpMarkersHit,
             isManualPaused, isAutoPaused, accuracyAchieved,
             isOffTrack, offTrackAnchor, isWrongWay,
-            upstreamAccumulatedM, downstreamAccumulatedM, wasSpeedZeroTriggered,
+            upstreamAnchor, zeroSpeedAnchor, wasSpeedZeroTriggered, isAustereLoopRunning,
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -216,9 +217,10 @@
             isOffTrack = state.isOffTrack || false;
             offTrackAnchor = state.offTrackAnchor || null;
             isWrongWay = state.isWrongWay || false;
-            upstreamAccumulatedM = state.upstreamAccumulatedM || 0;
-            downstreamAccumulatedM = state.downstreamAccumulatedM || 0;
+            upstreamAnchor = state.upstreamAnchor || null;
+            zeroSpeedAnchor = state.zeroSpeedAnchor || null;
             wasSpeedZeroTriggered = state.wasSpeedZeroTriggered || false;
+            isAustereLoopRunning = state.isAustereLoopRunning || false;
 
             switchMode(state.currentMode || 'REC');
 
@@ -362,9 +364,10 @@
             isOffTrack = false;
             offTrackAnchor = null;
             stopWrongWayAudioLoop();
-            upstreamAccumulatedM = 0;
-            downstreamAccumulatedM = 0;
+            upstreamAnchor = null;
+            zeroSpeedAnchor = null;
             wasSpeedZeroTriggered = false;
+            isAustereLoopRunning = false;
             document.body.classList.remove('panic-mode');
             updateTargetDisplay();
             saveStateToVault();
@@ -430,11 +433,25 @@
 
     function triggerWrongWayAudioLoop() {
         if (wrongWayInterval) return;
+        isAustereLoopRunning = false;
         const alertPhrase = "WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY";
         speak(alertPhrase);
         wrongWayInterval = setInterval(() => {
             speak(alertPhrase);
         }, 2000); 
+    }
+
+    function triggerAustereAudioLoop() {
+        if (wrongWayInterval) {
+            clearInterval(wrongWayInterval);
+            wrongWayInterval = null;
+        }
+        isAustereLoopRunning = true;
+        const austerePhrase = "Listen! you are driving the wrong way in the special stage. It is Dangerous, turn around immediately!";
+        speak(austerePhrase);
+        wrongWayInterval = setInterval(() => {
+            speak(austerePhrase);
+        }, 3000);
     }
 
     function stopWrongWayAudioLoop() {
@@ -443,7 +460,10 @@
             wrongWayInterval = null;
         }
         isWrongWay = false;
-        upstreamAccumulatedM = 0;
+        upstreamAnchor = null;
+        zeroSpeedAnchor = null;
+        wasSpeedZeroTriggered = false;
+        isAustereLoopRunning = false;
     }
 
     function announceCorrectDirectionDouble() {
@@ -541,7 +561,7 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
-                // --- ADVANCED SYMMETRIC WRONG WAY STATE MACHINE ENGINE ---
+                // --- ADVANCED STATE MACHINE WRONG WAY ENGINE WITH MOMENTUM DETECTORS (v4.25) ---
                 if (minPathDist <= 0.02 && !isOffTrack && lastCoords) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     let angleDiff = 0;
@@ -559,55 +579,60 @@
                         if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     }
 
-                    let incrementalDistM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude) * 1000;
-
-                    // ZERO SPEED PAUSE MECHANISM
+                    // DUAL TRIGGER GATE A: SPEED DROPS TO ZERO (COMPLY & MANEUVER)
                     if (curSpeed < 1.0) {
                         if (isWrongWay && !wasSpeedZeroTriggered) {
                             if (wrongWayInterval) {
                                 clearInterval(wrongWayInterval);
                                 wrongWayInterval = null;
                             }
-                            speak("WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY"); // One last warning
+                            speak("WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY"); // Voice final phrase
                             wasSpeedZeroTriggered = true;
+                            zeroSpeedAnchor = { lat: latitude, lon: longitude }; // Pin anchor baseline immediately
                         }
                     } else {
-                        // Vehicle is in motion upstream or downstream
+                        // Vehicle is moving under speed threshold calculations
                         if (angleDiff > 135) {
-                            downstreamAccumulatedM = 0; // Reset opposite gate metrics immediately
+                            // DUAL TRIGGER GATE B: ENFORCING INTERACTION GATES WHILE DRIVING UPSTREAM
                             if (!isWrongWay) {
-                                upstreamAccumulatedM += incrementalDistM;
-                                if (upstreamAccumulatedM >= 20) { // Strict 20-meter upstream gate validation
+                                if (!upstreamAnchor) {
+                                    upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
+                                }
+                                let displacementM = calculateHaverDist(upstreamAnchor.lat, upstreamAnchor.lon, latitude, longitude) * 1000;
+                                if (displacementM >= 20) { // Entry validation gate
                                     isWrongWay = true;
                                     wasSpeedZeroTriggered = false;
                                     document.body.classList.add('panic-mode');
                                     document.getElementById('partialLabel').innerText = "WRONG WAY!";
                                     triggerWrongWayAudioLoop();
                                 }
-                            } else if (wasSpeedZeroTriggered) {
-                                // Resume tracking upstream movement if they choose to ignore zero-speed warning
-                                upstreamAccumulatedM += incrementalDistM;
-                                if (upstreamAccumulatedM >= 20) {
-                                    wasSpeedZeroTriggered = false;
-                                    triggerWrongWayAudioLoop();
-                                    upstreamAccumulatedM = 0;
+                            } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
+                                // Checking if team breaks zero speed hold and continues driving backward
+                                let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
+                                if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
+                                    triggerAustereAudioLoop();
                                 }
                             }
                         } else if (angleDiff < 90) {
-                            upstreamAccumulatedM = 0; // Reset upstream accumulation immediately
+                            // FAST HANDBRAKE ACTIVATION OR FORWARD COMPLIANCE DISPLACEMENT DETECTOR
+                            upstreamAnchor = null; 
                             
                             if (isWrongWay) {
-                                // Shuffling or maneuvering completed. Kill alert loops instantly to give quiet space
+                                // Handbrake turn or shuffle completed directionally! Kill alert lines immediately for silence space
                                 if (wrongWayInterval) {
                                     clearInterval(wrongWayInterval);
                                     wrongWayInterval = null;
                                 }
                                 wasSpeedZeroTriggered = false;
 
-                                downstreamAccumulatedM += incrementalDistM;
-                                if (downstreamAccumulatedM >= 20) { // Strict 20-meter downstream safety validation
+                                // If they did an instant handbrake turn, zeroSpeedAnchor won't exist. Establish pivot tracker instead.
+                                if (!zeroSpeedAnchor) {
+                                    zeroSpeedAnchor = { lat: latitude, lon: longitude };
+                                }
+
+                                let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
+                                if (recoveryDisplacementM >= 20) { // Symmetric 20-meter safety confirmation gate achieved
                                     stopWrongWayAudioLoop();
-                                    downstreamAccumulatedM = 0;
                                     document.body.classList.remove('panic-mode');
                                     document.getElementById('partialLabel').innerText = "Distance to WP";
                                     announceCorrectDirectionDouble();
@@ -833,9 +858,10 @@
         watchId = null; isAutoPaused = false; navStarted = false; accuracyAchieved = false; isManualPaused = false;
         isOffTrack = false; offTrackAnchor = null;
         stopWrongWayAudioLoop();
-        upstreamAccumulatedM = 0;
-        downstreamAccumulatedM = 0;
+        upstreamAnchor = null;
+        zeroSpeedAnchor = null;
         wasSpeedZeroTriggered = false;
+        isAustereLoopRunning = false;
         mainBtn.innerText = (currentMode === 'NAV') ? "START NAVIGATION" : "START TRACKING";
         mainBtn.className = "start-btn"; mainBtn.style.background = "#34a853";
         document.body.classList.remove('panic-mode');
@@ -918,9 +944,10 @@
                 trackPoints = []; waypoints = []; globalWpCounter = 1;
                 isOffTrack = false; offTrackAnchor = null;
                 stopWrongWayAudioLoop();
-                upstreamAccumulatedM = 0;
-                downstreamAccumulatedM = 0;
+                upstreamAnchor = null;
+                zeroSpeedAnchor = null;
                 wasSpeedZeroTriggered = false;
+                isAustereLoopRunning = false;
                 document.body.classList.remove('panic-mode');
                 document.getElementById('total').innerText = "0.00";
                 document.getElementById('partial').innerText = "0.00";
