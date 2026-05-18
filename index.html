@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.25</title>
+    <title>StageMaster 4.26</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -101,7 +101,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.25</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.26</div>
 </div>
 
 <div id="reportModal">
@@ -139,7 +139,7 @@
     let wrongWayInterval = null;
     let mainBtn = null; 
 
-    // Advanced Absolute Displacement Model Variables (v4.25)
+    // Advanced Absolute Displacement Model Variables (v4.26)
     let upstreamAnchor = null;
     let zeroSpeedAnchor = null;
     let wasSpeedZeroTriggered = false;
@@ -561,7 +561,7 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
-                // --- ADVANCED STATE MACHINE WRONG WAY ENGINE WITH MOMENTUM DETECTORS (v4.25) ---
+                // --- ADVANCED STATE MACHINE WRONG WAY ENGINE WITH MOMENTUM DETECTORS (v4.26) ---
                 if (minPathDist <= 0.02 && !isOffTrack && lastCoords) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     let angleDiff = 0;
@@ -672,7 +672,7 @@
                     }
                 }
 
-                // --- CHECKPOINT NOTIFICATION GATES ---
+                // --- CHECKPOINT NOTIFICATION GATES (CORRECTED v4.26 PACING STRATEGY) ---
                 if (!isOffTrack && !isWrongWay) {
                     const target = navWaypoints[activeWpIndex];
                     if (target) {
@@ -691,16 +691,16 @@
                             speak("Approaching " + cleanName + " in 1 kilometer");
                             wpMarkersHit.p1km = true;
                         }
-                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) {
+                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) { // 500m fully restored
                             speak("500 meters" + tulipNote);
                             wpMarkersHit.p500 = true;
                         }
-                        if (distM <= 150 && distM > 140 && !wpMarkersHit.p150) {
-                            speak("Approaching " + cleanName + " in 150 meters" + tulipNote);
+                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p150) { // Upgraded to 200 meters
+                            speak("Approaching " + cleanName + " in 200 meters" + tulipNote);
                             wpMarkersHit.p150 = true;
                         }
-                        if (distM <= 50 && distM > 40 && !wpMarkersHit.p50) {
-                            speak("50 meters");
+                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p50) { // Upgraded to 80 meters
+                            speak("80 meters");
                             wpMarkersHit.p50 = true;
                         }
                         
@@ -734,7 +734,7 @@
                                     if (nextDistM <= 530 && nextDistM >= 450) {
                                         wpMarkersHit.p500 = true; 
                                     }
-                                    if (nextDistM <= 180 && nextDistM >= 140) {
+                                    if (nextDistM <= 230 && nextDistM >= 190) {
                                         wpMarkersHit.p150 = true;
                                     }
                                 }, 2500);
