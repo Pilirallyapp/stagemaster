@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.28</title>
+    <title>StageMaster 4.29</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
-        .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
-        .header h1 span { text-transform: lowercase; font-size: 1.2rem; }
-        .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; position: relative; z-index: 10; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #1a1a1a; color: white; margin: 0; padding: env(safe-area-inset-top, 5px) 0 env(safe-area-inset-bottom, 5px) 0; height: 100vh; box-sizing: border-box; overflow: hidden; }
+        .header h1 { margin: 2px 0 5px 0; font-size: 1.5rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
+        .header h1 span { text-transform: lowercase; font-size: 1rem; }
+        .card { background: #2d2d2d; padding: 0.8rem; border-radius: 20px; width: 94%; max-width: 450px; height: 92vh; max-height: 680px; text-align: center; position: relative; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
         
-        .mode-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 15px; }
-        .mode-btn { height: 45px; background: #3d3d3d; color: #888; border-radius: 12px; font-size: 0.8rem; border: 2px solid transparent; }
+        .mode-container { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+        .mode-btn { height: 38px; background: #3d3d3d; color: #888; border-radius: 12px; font-size: 0.8rem; border: 2px solid transparent; font-weight: bold; text-transform: uppercase; }
         .mode-btn.active { background: #bf953f; color: black; border-color: white; }
 
-        .metric { margin: 8px 0; padding: 10px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
+        .metric { margin: 4px 0; padding: 6px; border-radius: 12px; background: #3d3d3d; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; flex-grow: 1; min-height: 50px; }
         .total-box { border-left: 6px solid #ea4335; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; }
         .go-flash { animation: flashing-green 0.5s infinite; }
@@ -23,20 +23,20 @@
         .panic-mode { animation: panic-bg 0.5s infinite; }
         @keyframes panic-bg { 0% { background-color: #1a1a1a; } 50% { background-color: #7a1a1a; } 100% { background-color: #1a1a1a; } }
 
-        .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; }
-        .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; }
+        .label { font-size: 0.7rem; color: #aaa; text-transform: uppercase; margin-bottom: 2px; }
+        .value { font-size: 3.2rem; font-weight: bold; font-family: monospace; line-height: 1; }
         
         button { border: none; border-radius: 12px; cursor: pointer; font-weight: bold; text-transform: uppercase; touch-action: none; position: relative; overflow: hidden; }
-        .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 65px; width: 100%; margin-top: 10px; }
-        .stop-btn { background-color: #ea4335; color: white; font-size: 1.4rem; height: 65px; width: 100%; margin-top: 10px; }
-        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 90px; width: 100%; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
+        .start-btn { background-color: #34a853; color: white; font-size: 1.2rem; height: 50px; width: 100%; margin-top: 4px; flex-shrink: 0; }
+        .stop-btn { background-color: #ea4335; color: white; font-size: 1.2rem; height: 50px; width: 100%; margin-top: 4px; flex-shrink: 0; }
+        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.3rem; height: 65px; width: 100%; margin-top: 4px; border-bottom: 4px solid #0d47a1; flex-shrink: 0; }
         
-        .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; width: 100%; }
-        .wp-btn { height: 110px; background: #1a1a1a; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: none; }
+        .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 6px; width: 100%; flex-shrink: 0; }
+        .wp-btn { height: 85px; background: #1a1a1a; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: none; margin: 0 auto; width: 85px; }
         .progress-ring { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: conic-gradient(transparent 0deg, #444 0deg); z-index: 1; }
-        .wp-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; background: #1a1a1a; border-radius: 50%; z-index: 2; }
-        .wp-btn img { width: 65px; height: 65px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
-        .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 3; }
+        .wp-btn::after { content: ''; position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px; background: #1a1a1a; border-radius: 50%; z-index: 2; }
+        .wp-btn img { width: 45px; height: 45px; object-fit: contain; z-index: 3; margin-bottom: 1px; }
+        .wp-label { font-size: 0.65rem; font-weight: bold; z-index: 3; }
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
@@ -52,15 +52,15 @@
         <button id="modeNav" class="mode-btn" onclick="switchMode('NAV')">NAV MODE</button>
     </div>
 
-    <div id="navControls" style="display: none; margin-bottom: 10px;">
+    <div id="navControls" style="display: none; margin-bottom: 4px;">
         <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="startImport(event)">
-        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
+        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 42px; font-size: 0.9rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
     </div>
 
     <div class="metric">
         <div class="label">Speed KM/H</div>
-        <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 5rem;">0</div>
-        <div id="accuracy" style="font-size: 0.7rem; padding: 4px 10px; border-radius: 10px; font-weight: bold; display: inline-block; background: #ea4335;">GPS: OFFLINE</div>
+        <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 3.8rem;">0</div>
+        <div id="accuracy" style="font-size: 0.65rem; padding: 2px 8px; border-radius: 8px; font-weight: bold; display: inline-block; background: #ea4335; margin: 2px auto 0 auto; width: fit-content;">GPS: OFFLINE</div>
     </div>
 
     <div class="metric total-box" id="totalArea">
@@ -71,15 +71,15 @@
     <div class="metric partial-box">
         <div class="label" id="partialLabel">Partial KM</div>
         <div id="partial" class="value">0.00</div>
-        <div id="wpTargetDisplay" style="font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-top: 5px; display: none;">TARGET: ---</div>
+        <div id="wpTargetDisplay" style="font-size: 0.75rem; color: #fbbc05; font-weight: bold; margin-top: 2px; display: none;">TARGET: ---</div>
     </div>
 
     <button id="recToggleBtn" class="start-btn">START RECORDING</button>
     <button id="navToggleBtn" class="start-btn" style="display: none;">START NAVIGATION</button>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-        <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
-        <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; flex-shrink: 0;">
+        <div style="background: #3d3d3d; padding: 6px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
+        <div style="background: #3d3d3d; padding: 6px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">0.0</div></div>
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
@@ -102,7 +102,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.28</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 5px; flex-shrink: 0;">version 4.29</div>
 </div>
 
 <div id="reportModal">
@@ -141,7 +141,7 @@
     let rBtn = null;
     let nBtn = null;
 
-    // Advanced Absolute Displacement Model Variables (v4.28)
+    // Advanced Absolute Displacement Model Variables (v4.29)
     let upstreamAnchor = null;
     let zeroSpeedAnchor = null;
     let wasSpeedZeroTriggered = false;
@@ -572,7 +572,7 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
-                if (minPathDist <= 0.02 && !isOffTrack && lastCoords) {
+                if (minPathDist <= 0.035 && !isOffTrack && lastCoords) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     let angleDiff = 0;
                     
@@ -642,441 +642,8 @@
                         }
                     }
                 }
-
-                if (minPathDist > 0.08) { 
-                    if (isWrongWay) stopWrongWayAudioLoop(); 
-                    
-                    if (!isOffTrack) { 
-                        isOffTrack = true; 
-                        document.body.classList.add('panic-mode'); 
-                        document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
-                        offTrackAnchor = { lat: latitude, lon: longitude }; 
-                    }
-                }
-
-                if (isOffTrack) {
-                    let currentActualDistM = minPathDist * 1000;
-                    document.getElementById('partial').innerText = "-" + Math.round(currentActualDistM);
-
-                    if (Date.now() - lastOffTrackWarning > 10000 && !isWrongWay) {
-                        speak("You are off course, return back");
-                        lastOffTrackWarning = Date.now();
-                    }
-
-                    if (minPathDist < 0.01) { 
-                        isOffTrack = false;
-                        offTrackAnchor = null;
-                        document.body.classList.remove('panic-mode');
-                        document.getElementById('partialLabel').innerText = "Distance to WP";
-                        announceBackOnTrackDouble(); 
-                    }
-                }
-
-                if (!isOffTrack && !isWrongWay) {
-                    const target = navWaypoints[activeWpIndex];
-                    if (target) {
-                        const distToWp = calculateHaverDist(latitude, longitude, target.lat, target.lon);
-                        document.getElementById('partial').innerText = distToWp.toFixed(2);
-                        
-                        const distM = distToWp * 1000;
-                        const cleanName = formatWpName(target.name);
-                        const tulipNote = target.desc ? `, ${target.desc}` : "";
-
-                        if (distM <= 2000 && distM > 1950 && !wpMarkersHit.p2km) {
-                            speak("Approaching " + cleanName + " in 2 kilometers");
-                            wpMarkersHit.p2km = true;
-                        }
-                        if (distM <= 1000 && distM > 950 && !wpMarkersHit.p1km) {
-                            speak("Approaching " + cleanName + " in 1 kilometer");
-                            wpMarkersHit.p1km = true;
-                        }
-                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) { 
-                            speak("500 meters" + tulipNote);
-                            wpMarkersHit.p500 = true;
-                        }
-                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p150) { 
-                            speak("Approaching " + cleanName + " in 200 meters" + tulipNote);
-                            wpMarkersHit.p150 = true;
-                        }
-                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p50) { 
-                            speak("80 meters");
-                            wpMarkersHit.p50 = true;
-                        }
-                        
-                        if (distM <= 20) {
-                            speak("Arrived at " + cleanName + tulipNote);
-                            
-                            if (target.name.toUpperCase().includes("FLYING")) {
-                                handleResetAndStop(false);
-                                speak("Special Stage Finished");
-                                return;
-                            }
-
-                            activeWpIndex++;
-                            
-                            wpMarkersHit.p2km = false;
-                            wpMarkersHit.p1km = false;
-                            wpMarkersHit.p500 = false;
-                            wpMarkersHit.p150 = false;
-                            wpMarkersHit.p50 = false;
-                            
-                            updateTargetDisplay();
-                            
-                            if (activeWpIndex < navWaypoints.length) {
-                                setTimeout(() => {
-                                    let nextTarget = navWaypoints[activeWpIndex];
-                                    let nextName = formatWpName(nextTarget.name);
-                                    let nextDist = calculateHaverDist(latitude, longitude, nextTarget.lat, nextTarget.lon);
-                                    speak("Distance to " + nextName + " is " + nextDist.toFixed(2) + " kilometers");
-                                    
-                                    let nextDistM = nextDist * 1000;
-                                    if (nextDistM <= 530 && nextDistM >= 450) {
-                                        wpMarkersHit.p500 = true; 
-                                    }
-                                    if (nextDistM <= 230 && nextDistM >= 190) {
-                                        wpMarkersHit.p150 = true;
-                                    }
-                                }, 2500);
-                            }
-                        }
-                    }
-                }
             }
         }
-
-        if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
-        
-        if (curSpeed < 1.0) {
-            resumeStrikeStartTime = null;
-            if (!isAutoPaused && !stopTimeStart) stopTimeStart = Date.now();
-            if (!isAutoPaused && stopTimeStart && (Date.now() - stopTimeStart > 60000)) {
-                isAutoPaused = true; speak("Paused");
-                if (navStarted && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
-                clearInterval(timerInterval); releaseWakeLock();
-                saveStateToVault();
-            }
-        } else if (curSpeed >= 2.0) {
-            stopTimeStart = null;
-            if (isAutoPaused) {
-                if (!resumeStrikeStartTime) resumeStrikeStartTime = Date.now();
-                if (Date.now() - resumeStrikeStartTime >= 3000) {
-                    isAutoPaused = false; speak("Resumed");
-                    if (navStarted) {
-                        sessionStartTime = Date.now(); 
-                        startTimer(); 
-                    }
-                    requestWakeLock();
-                    saveStateToVault();
-                }
-            }
-        }
-
-        if (isAutoPaused || !lastCoords) return;
-        const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
-        if (d > 0.002) {
-            if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
-                totalDist += d; partialDist += d;
-            }
-            if (currentMode === 'REC') {
-                document.getElementById('total').innerText = totalDist.toFixed(2);
-                document.getElementById('partial').innerText = partialDist.toFixed(2);
-            }
-            if (navStarted || currentMode === 'REC') {
-                const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
-                if (elapsed > 0) {
-                    document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
-                }
-            }
-            trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
-            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-            saveStateToVault();
-        }
-    }
-
-    function startTimer() {
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            const ms = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
-            const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
-            document.getElementById('timer').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-        }, 1000);
-    }
-
-    // ==========================================
-    // BUTTON HAT 1: REC MODE CONTROL SEQUENCE
-    // ==========================================
-    rBtn = document.getElementById('recToggleBtn');
-    rBtn.addEventListener('touchstart', (e) => {
-        requestWakeLock();
-        if (rBtn.innerText === "START RECORDING" || rBtn.innerText === "RESUME REC") {
-            isWaitingForAccuracy = true; 
-            accuracyAchieved = false;
-            isManualPaused = false;
-            
-            watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
-            rBtn.innerText = "PAUSE REC"; rBtn.className = "stop-btn"; rBtn.style.background = "#ea4335";
-            speak("Waiting for GPS accuracy");
-            saveStateToVault();
-        } else {
-            e.preventDefault();
-            let p = 0;
-            let wasLongPressTriggered = false;
-            
-            let itv = setInterval(() => {
-                p += 2; rBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
-                if (p >= 100) { 
-                    clearInterval(itv); 
-                    wasLongPressTriggered = true;
-                    handleOpenSummaryModal(true); // Open summary pop-up but don't wipe data yet!
-                }
-            }, 60);
-
-            rBtn.addEventListener('touchend', () => { 
-                clearInterval(itv); 
-                if (!wasLongPressTriggered) {
-                    // BRIEF TAP DETECTED: Pause recording cleanly, drop tracking
-                    rBtn.style.background = "#34a853";
-                    rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn";
-                    speak("RECORDING PAUSED");
-                    isManualPaused = true;
-                    
-                    if (sessionStartTime) {
-                        accumulatedTime += (Date.now() - sessionStartTime);
-                        sessionStartTime = null;
-                    }
-                    clearInterval(timerInterval);
-                    if (watchId) navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                    accuracyAchieved = false;
-                    lastCoords = null; 
-                    releaseWakeLock();
-                    saveStateToVault();
-                }
-            }, {once:true});
-        }
-    });
-
-    // ==========================================
-    // BUTTON HAT 2: NAV MODE CONTROL SEQUENCE
-    // ==========================================
-    nBtn = document.getElementById('navToggleBtn');
-    nBtn.addEventListener('touchstart', (e) => {
-        requestWakeLock();
-        if (nBtn.innerText === "START NAVIGATION" || nBtn.innerText === "RESUME NAV") {
-            isWaitingForAccuracy = true; 
-            accuracyAchieved = false;
-            isManualPaused = false;
-            
-            watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
-            nBtn.innerText = "PAUSE NAV"; nBtn.className = "stop-btn"; nBtn.style.background = "#ea4335";
-            speak("Waiting for GPS accuracy");
-            saveStateToVault();
-        } else {
-            e.preventDefault();
-            let p = 0;
-            let itv = setInterval(() => {
-                p += 2; nBtn.style.background = `linear-gradient(to bottom, white ${p}%, #ea4335 ${p}%)`;
-                if (p >= 100) { 
-                    clearInterval(itv); 
-                    handlePause(); 
-                    nBtn.style.background = "#34a853"; 
-                }
-            }, 60);
-            nBtn.addEventListener('touchend', () => { 
-                clearInterval(itv); 
-                nBtn.style.background = "#ea4335"; 
-                if(p<100) handlePause(); 
-            }, {once:true});
-        }
-    });
-
-    function handlePause() {
-        speak("PAUSING NAVIGATION");
-        isManualPaused = true;
-        nBtn.innerText = "RESUME NAV"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
-        if (sessionStartTime) {
-            accumulatedTime += (Date.now() - sessionStartTime);
-            sessionStartTime = null;
-        }
-        clearInterval(timerInterval);
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        accuracyAchieved = false;
-        stopWrongWayAudioLoop();
-        document.body.classList.remove('panic-mode');
-        releaseWakeLock();
-        saveStateToVault();
-    }
-
-    // Opens the summary interface window safely without purging data lines
-    function handleOpenSummaryModal(showModal) {
-        speak("STOPPING AND PREVIEWING STAGE");
-        if (sessionStartTime) {
-            accumulatedTime += (Date.now() - sessionStartTime);
-            sessionStartTime = null;
-        }
-        clearInterval(timerInterval); 
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null; isAutoPaused = false; accuracyAchieved = false;
-        
-        rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
-        
-        if (showModal && currentMode === 'REC') {
-            const count = waypoints.filter(w => w.type === 's' || w.type === 'rp' || w.type === 'nos').length;
-            document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
-            document.getElementById('reportModal').style.display = 'flex';
-            setTimeout(() => { document.getElementById('stageName').focus(); }, 200);
-        }
-        saveStateToVault();
-    }
-
-    function closeModalAndResumeRecording() {
-        // Safe Escape Hatch: Close pop-up window, retain data, toggle to resume state
-        document.getElementById('reportModal').style.display = 'none'; 
-        rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
-        speak("Stage summary closed. Ready to resume recording.");
-        saveStateToVault();
-    }
-
-    function handleResetAndStop(showModal) {
-        if (sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
-        clearInterval(timerInterval); 
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null; isAutoPaused = false; navStarted = false; accuracyAchieved = false; isManualPaused = false;
-        isOffTrack = false; offTrackAnchor = null;
-        stopWrongWayAudioLoop();
-        upstreamAnchor = null;
-        zeroSpeedAnchor = null;
-        wasSpeedZeroTriggered = false;
-        isAustereLoopRunning = false;
-        
-        rBtn.innerText = "START RECORDING"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
-        nBtn.innerText = "START NAVIGATION"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
-        
-        document.body.classList.remove('panic-mode');
-        document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
-        releaseWakeLock();
-        clearVault();
-        if (showModal && currentMode === 'REC') {
-            const count = waypoints.filter(w => w.type === 's' || w.type === 'rp' || w.type === 'nos').length;
-            document.getElementById('modalData').innerHTML = `• KM: ${totalDist.toFixed(2)}<br>• RALLY WAYPOINTS: ${count}<br>• AVG: ${document.getElementById('speed').innerText} KM/H`;
-            document.getElementById('reportModal').style.display = 'flex';
-            setTimeout(() => { document.getElementById('stageName').focus(); }, 200);
-        }
-    }
-
-    function saveFileName() {
-        const input = document.getElementById('stageName');
-        const saveBtn = document.getElementById('saveNameBtn');
-        input.classList.add('locked');
-        saveBtn.style.background = "#34a853"; saveBtn.innerText = "OK";
-        document.getElementById('exportBtn').style.opacity = "1";
-        document.getElementById('exportBtn').style.pointerEvents = "auto";
-        speak("Stage name saved");
-    }
-
-    function closeModal() { 
-        document.getElementById('reportModal').style.display = 'none'; 
-        handleResetAndStop(false);
-    }
-
-    const pBtn = document.getElementById('resetPartialBtn');
-    pBtn.onclick = () => { partialDist = 0; document.getElementById('partial').innerText = "0.00"; speak("Partial Reset"); saveStateToVault(); };
-
-    function setupWaypointBtn(id, ringId, color, type) {
-        const btn = document.getElementById(id);
-        const ring = document.getElementById(ringId);
-        let timer;
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            let deg = 0;
-            timer = setInterval(() => {
-                deg += 7.2;
-                ring.style.background = `conic-gradient(${color} ${deg}deg, #444 ${deg}deg)`;
-                if (deg >= 360) {
-                    clearInterval(timer);
-                    ring.style.background = `conic-gradient(transparent 0deg, #444 0deg)`;
-                    mark(type);
-                    partialDist = 0; document.getElementById('partial').innerText = "0.00"; 
-                }
-            }, 40); 
-        });
-        btn.addEventListener('touchend', () => { clearInterval(timer); ring.style.background = `conic-gradient(transparent 0deg, #444 0deg)`; });
-    }
-
-    setupWaypointBtn('btn-rp', 'ring-rp', '#fbbc05', 'double');
-    setupWaypointBtn('btn-nos', 'ring-nos', '#1a73e8', 'long');
-    setupWaypointBtn('btn-marshal', 'ring-marshal', '#e67e22', 'marshal');
-
-    function mark(type) {
-        if (!lastCoords) return;
-        let n = "", s = "", iconKey = "";
-        const dist = totalDist.toFixed(2);
-        if (type === 'start') { n = "START FLAG"; iconKey = "start"; }
-        else if (type === 'long') { n = "NO S"; s = `No Safety Marshal saved at ${dist} kilometers`; iconKey = "nos"; }
-        else if (type === 'double') { n = `RP${globalWpCounter++}`; s = `Radio Point ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "rp"; }
-        else if (type === 'marshal') { n = `S${globalWpCounter++}`; s = `S ${globalWpCounter-1} saved at ${dist} kilometers`; iconKey = "s"; }
-        waypoints.push({ lat: lastCoords.lat, lon: lastCoords.lon, ele: lastCoords.ele, name: `${n} | ${dist}KM`, type: iconKey });
-        saveStateToVault();
-        if(s) speak(s);
-    }
-
-    const totalArea = document.getElementById('totalArea');
-    totalArea.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        let p = 0;
-        let itv = setInterval(() => {
-            p += 2; totalArea.style.background = `linear-gradient(to bottom, white ${p}%, #3d3d3d ${p}%)`;
-            if (p >= 100) {
-                clearInterval(itv); totalArea.style.background = "#3d3d3d";
-                totalDist = 0; partialDist = 0; accumulatedTime = 0;
-                trackPoints = []; waypoints = []; globalWpCounter = 1;
-                isOffTrack = false; offTrackAnchor = null;
-                stopWrongWayAudioLoop();
-                upstreamAnchor = null;
-                zeroSpeedAnchor = null;
-                wasSpeedZeroTriggered = false;
-                isAustereLoopRunning = false;
-                document.body.classList.remove('panic-mode');
-                document.getElementById('total').innerText = "0.00";
-                document.getElementById('partial').innerText = "0.00";
-                document.getElementById('timer').innerText = "00:00:00";
-                document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
-                clearVault();
-                speak("TOTAL KILOMETERS AND TIMER RESET");
-            }
-        }, 60);
-        totalArea.addEventListener('touchend', () => { clearInterval(itv); totalArea.style.background = "#3d3d3d"; }, {once:true});
-    });
-
-    function exportKML() {
-        const fileName = document.getElementById('stageName').value || "StageMaster_SS";
-        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${fileName}</name>`;
-        Object.keys(ICONS).forEach(key => {
-            kml += `<Style id="${key}Icon"><IconStyle><Icon><href>${ICONS[key]}</href></Icon><scale>2.5</scale></IconStyle></Style>`;
-        });
-        waypoints.forEach(wp => {
-            let style = wp.type ? `<styleUrl>#${wp.type}Icon</styleUrl>` : '';
-            kml += `<Placemark><name>${wp.name}</name>${style}<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point></Placemark>`;
-        });
-        if (trackPoints.length > 0) {
-            const last = trackPoints[trackPoints.length - 1];
-            kml += `<Placemark><name>FLYING FINISH | ${totalDist.toFixed(2)}KM</name><styleUrl>#finishIcon</styleUrl><Point><coordinates>${last.lon},${last.lat},${last.ele}</coordinates></Point></Placemark>`;
-        }
-        kml += `<Placemark><name>Path</name><Style><LineStyle><color>ff0000ff</color><width>5</width></LineStyle></Style><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>`;
-        trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
-        kml += `</coordinates></LineString></Placemark></Document></kml>`;
-        
-        // Purge memory loops ONLY after file is generated
-        totalDist = 0; partialDist = 0; accumulatedTime = 0;
-        trackPoints = []; waypoints = []; globalWpCounter = 1;
-        document.getElementById('total').innerText = "0.00";
-        document.getElementById('partial').innerText = "0.00";
-        document.getElementById('timer').innerText = "00:00:00";
-        rBtn.innerText = "START RECORDING"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
-        document.getElementById('reportModal').style.display = 'none';
-        clearVault();
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
 </script>
 </body>
