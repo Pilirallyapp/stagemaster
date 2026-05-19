@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.30</title>
+    <title>StageMaster 4.32</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #1a1a1a; color: white; margin: 0; padding: env(safe-area-inset-top, 5px) 0 env(safe-area-inset-bottom, 5px) 0; height: 100vh; box-sizing: border-box; overflow: hidden; position: relative; }
         
-        /* Custom Pull-to-Refresh UI Components */
+        /* Pull-to-Refresh Component UI */
         #ptr-zone { position: absolute; top: 0; left: 0; width: 100%; height: 60px; z-index: 99999; }
         #ptr-element { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; background: #2d2d2d; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,0.5); border: 2px solid #bf953f; transition: transform 0.1s linear; pointer-events: none; z-index: 99999; }
         #ptr-icon { width: 20px; height: 20px; border: 3px solid #bf953f; border-top-color: transparent; border-radius: 50%; transition: transform 0.1s linear; }
@@ -113,7 +113,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 5px; flex-shrink: 0;">version 4.30</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 5px; flex-shrink: 0;">version 4.32</div>
 </div>
 
 <div id="reportModal">
@@ -182,10 +182,11 @@
     }
 
     function formatWpName(name) {
-        let clean = name.split('|')[0].trim();
-        if (clean.toUpperCase().startsWith('RP')) return clean.replace(/RP/i, 'Radio Point ');
-        if (clean.toUpperCase().startsWith('S')) return clean.replace(/S/i, 'S ');
-        return clean;
+        let clean = name.replace(/^(RP|NOS|S)\d+_/i, '');
+        clean = clean.replace(/^WP\d+_/i, '');
+        clean = clean.replace(/^(RP|NOS|S)\d+/i, '');
+        clean = clean.replace(/^WP\d+/i, '');
+        return clean.trim() || name;
     }
 
     function saveStateToVault() {
@@ -286,7 +287,6 @@
         localStorage.removeItem('stagemaster_vault');
     }
 
-    /* Embedded Custom Swipe-to-Refresh Mechanism */
     function setupPullToRefresh() {
         const zone = document.getElementById('ptr-zone');
         const elem = document.getElementById('ptr-element');
@@ -353,10 +353,8 @@
         }
         
         if (mode === 'NAV' && navWaypoints.length > 0) {
-            document.getElementById('importBtn').style.backgroundColor = "#34a853";
             document.getElementById('importBtn').innerText = `COMPLETED: ${activeWpIndex} / ${navWaypoints.length}`;
         } else if (mode === 'NAV') {
-            document.getElementById('importBtn').style.backgroundColor = "#1a73e8";
             document.getElementById('importBtn').innerText = "IMPORT KML PATH";
         }
         updateTargetDisplay();
@@ -446,7 +444,7 @@
         }
 
         if (navWaypoints[activeWpIndex]) {
-            let name = navWaypoints[activeWpIndex].name.split('|')[0].trim();
+            let name = formatWpName(navWaypoints[activeWpIndex].name);
             document.getElementById('wpTargetDisplay').innerText = "TARGET: " + name;
         }
         if (navWaypoints.length > 0) {
@@ -583,6 +581,7 @@
             }
             rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
             speak("Recording paused");
+            showReportModal();
         }
         saveStateToVault();
     }
@@ -641,26 +640,21 @@
 
         totalArea.addEventListener('touchstart', (e) => {
             if (currentMode === 'NAV') return;
-            e.preventDefault(); 
             totalHoldTimer = setTimeout(() => {
-                totalDist = 0; partialDist = 0; accumulatedTime = 0;
+                totalDist = 0;
                 document.getElementById('total').innerText = "0.00";
-                document.getElementById('partial').innerText = "0.00";
-                document.getElementById('timer').innerText = "00:00:00";
-                document.getElementById('speed').innerText = "0.0";
-                trackPoints = []; waypoints = []; globalWpCounter = 1;
-                speak("System fully reset");
-                clearVault();
+                speak("Total cleared");
+                saveStateToVault();
             }, 3000);
-        }, { passive: false });
+        });
 
         totalArea.addEventListener('touchend', () => { clearTimeout(totalHoldTimer); });
+        totalArea.addEventListener('touchcancel', () => { clearTimeout(totalHoldTimer); });
 
-        /* Restored Targeting Color Maps for the Rings */
         const RING_COLORS = {
-            rp: '#fbbc05',      // Yellow
-            nos: '#1a73e8',     // Blue
-            marshal: '#e67e22'  // Orange
+            rp: '#fbbc05',
+            nos: '#1a73e8',
+            marshal: '#e67e22'
         };
 
         ['rp', 'nos', 'marshal'].forEach(type => {
@@ -669,7 +663,6 @@
             let pressTimer = null;
             
             btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
                 let start = null;
                 let ringColor = RING_COLORS[type];
                 
@@ -685,9 +678,14 @@
                         mark(type);
                     }
                 }, 50);
-            }, { passive: false });
+            });
 
             btn.addEventListener('touchend', () => {
+                clearInterval(pressTimer);
+                ring.style.background = 'conic-gradient(transparent 0deg, #444 0deg)';
+            });
+            
+            btn.addEventListener('touchcancel', () => {
                 clearInterval(pressTimer);
                 ring.style.background = 'conic-gradient(transparent 0deg, #444 0deg)';
             });
@@ -705,7 +703,7 @@
             else if (type === 'marshal') label = `S${globalWpCounter++}`;
             
             waypoints.push({ lat: latitude, lon: longitude, ele: altitude || 0, name: label, totalKM: totalDist });
-            speak(formatWpName(label) + " marked");
+            speak(label + " marked");
             saveStateToVault();
         }, handleGPSError, { enableHighAccuracy: true });
     }
@@ -936,10 +934,11 @@
                     else if (distToWp <= 0.15 && distToWp > 0.05 && !wpMarkersHit.p150) { 
                         if (targetWp.desc) speak(targetWp.desc);
                         else speak("One hundred fifty meters to " + formatWpName(targetWp.name));
-                        wpMarkersHit = true; 
+                        wpMarkersHit.p150 = true; 
                     }
                     else if (distToWp <= 0.05 && distToWp > 0.035 && !wpMarkersHit.p50) { speak("Fifty meters"); wpMarkersHit.p50 = true; }
 
+                    /* Target zone changed from 0.020 to exactly 0.035 (35 meters) */
                     if (distToWp <= 0.035) {
                         speak("Arrived at " + formatWpName(targetWp.name));
                         wpMarkersHit = { p2km: false, p1km: false, p500: false, p150: false, p50: false };
@@ -962,6 +961,80 @@
         }
         lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
         saveStateToVault();
+    }
+
+    function showReportModal() {
+        mark('finish');
+        let totalMs = accumulatedTime;
+        let h = Math.floor(totalMs / 3600000), m = Math.floor((totalMs % 3600000) / 60000), s = Math.floor((totalMs % 60000) / 1000);
+        let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        let avgSpeed = totalDist > 0 ? (totalDist / (totalMs / 3600000)).toFixed(1) : "0.0";
+        
+        let modalData = `
+            <b>DISTANCE:</b> ${totalDist.toFixed(2)} KM<br>
+            <b>TIME:</b> ${timeStr}<br>
+            <b>AVG SPEED:</b> ${avgSpeed} KM/H<br><br>
+            <b>WAYPOINTS MARKED:</b> ${waypoints.length}
+        `;
+        document.getElementById('modalData').innerHTML = modalData;
+        document.getElementById('reportModal').style.display = 'flex';
+    }
+
+    function closeModalAndResumeRecording() {
+        document.getElementById('reportModal').style.display = 'none';
+        if (waypoints.length > 0 && waypoints[waypoints.length - 1].name === 'FINISH') {
+            waypoints.pop();
+        }
+        toggleRecording();
+    }
+
+    function saveFileName() {
+        let name = document.getElementById('stageName').value.trim();
+        if(name === "") { speak("Please type a valid name"); return; }
+        speak("Stage name saved as " + name);
+    }
+
+    function exportKML() {
+        let stageNameInput = document.getElementById('stageName').value.trim();
+        let finalName = stageNameInput || "Recorded_Stage";
+        
+        let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>${finalName}</name>\n`;
+        
+        waypoints.forEach(wp => {
+            let iconUrl = ICONS.s;
+            if (wp.name === 'START') iconUrl = ICONS.start;
+            else if (wp.name === 'FINISH') iconUrl = ICONS.finish;
+            else if (wp.name.startsWith('RP')) iconUrl = ICONS.rp;
+            else if (wp.name.startsWith('NOS')) iconUrl = ICONS.nos;
+
+            kml += `<Placemark>\n<name>${wp.name}</name>\n<description>Total Distance: ${wp.totalKM.toFixed(2)} KM</description>\n<Style><IconStyle><Icon><href>${iconUrl}</href></Icon><scale>1.2</scale></IconStyle></Style>\n<Point><coordinates>${wp.lon},${wp.lat},${wp.ele}</coordinates></Point>\n</Placemark>\n`;
+        });
+
+        if (trackPoints.length > 0) {
+            kml += `<Placemark>\n<name>Driven Path</name>\n<LineString>\n<altitudeMode>absolute</altitudeMode>\n<coordinates>\n`;
+            trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele}\n`; });
+            kml += `</coordinates>\n</LineString>\n</Placemark>\n`;
+        }
+
+        kml += `</Document>\n</kml>`;
+        
+        let blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+        let link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${finalName}.kml`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        document.getElementById('reportModal').style.display = 'none';
+        totalDist = 0; partialDist = 0; accumulatedTime = 0;
+        document.getElementById('total').innerText = "0.00";
+        document.getElementById('partial').innerText = "0.00";
+        document.getElementById('timer').innerText = "00:00:00";
+        document.getElementById('speed').innerText = "0.0";
+        trackPoints = []; waypoints = []; globalWpCounter = 1;
+        clearVault();
+        speak("KML file downloaded. System reset.");
     }
 </script>
 </body>
