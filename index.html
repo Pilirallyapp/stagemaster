@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.60</title>
+    <title>StageMaster 4.61</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 4.60</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 4.61</div>
 </div>
 
 <div id="reportModal">
@@ -194,17 +194,21 @@
     function extractTulipImageUrl(descText) {
         if (!descText) return null;
         
-        // Match standard HTML img tags embedded with src containing web URLs or raw Base64 long text lines
-        const imgTagMatch = descText.match(/<img[^>]+src=["']([^"']+)["']/i);
-        if (imgTagMatch && imgTagMatch[1]) return imgTagMatch[1];
-        
-        // Fallback 1: Match naked Base64 image data strings directly
-        const base64Match = descText.match(/(data:image\/[a-zA-Z]*;base64,[^\s<>"]+)/i);
+        // Priority 1: Match naked Base64 image data strings directly (Bypasses Google URL completely)
+        const base64Match = descText.match(/(data:image\/[a-zA-Z]*;base64,[^\s<>""']+)/i);
         if (base64Match && base64Match[1]) return base64Match[1];
 
-        // Fallback 2: Match naked URL parameters that link to standard image extensions
-        const urlMatch = descText.match(/(https?:\/\/[^\s<>"]+\.(?:png|jpg|jpeg|gif|webp))/i);
-        if (urlMatch && urlMatch[1]) return urlMatch[1];
+        // Priority 2: Match standard HTML img tags embedded with src containing web URLs but exclude google hosted images
+        const imgTagMatch = descText.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (imgTagMatch && imgTagMatch[1] && !imgTagMatch[1].includes("usercontent.google.com")) {
+            return imgTagMatch[1];
+        }
+        
+        // Priority 3: Match naked non-Google URL parameters that link to standard image extensions
+        const urlMatch = descText.match(/(https?:\/\/[^\s<>""']+\.(?:png|jpg|jpeg|gif|webp))/i);
+        if (urlMatch && urlMatch[1] && !urlMatch[1].includes("usercontent.google.com")) {
+            return urlMatch[1];
+        }
         
         return null;
     }
@@ -654,7 +658,6 @@
                 let minPathDist = 999;
                 for (let pt of navPathCoords) {
                     let d = calculateHaverDist(latitude, longitude, pt.lat, pt.lon);
-                    if (d < minD) minPathDist = d; // Safe internal check mapping to minPathDist
                     if (d < minPathDist) minPathDist = d;
                 }
 
@@ -1148,7 +1151,7 @@
                 document.getElementById('timer').innerText = "00:00:00";
                 document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
                 document.getElementById('tulipLiveBox').style.display = 'none';
-                clearVault(); // Wipes vault out permanently when total reset is successfully completed
+                clearVault(); 
                 speak("TOTAL KILOMETERS AND TIMER RESET");
             }
         }, 60);
