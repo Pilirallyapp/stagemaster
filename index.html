@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.52</title>
+    <title>StageMaster 4.53</title>
     <style>
         body { 
             font-family: sans-serif; 
@@ -124,7 +124,7 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.52</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.53</div>
 </div>
 
 <div id="reportModal">
@@ -850,7 +850,7 @@
             isAutoPaused = false;
             stopTimeStart = null;
             speak("Please stay still to catch accuracy");
-            rBtn.innerText = "WAITING GPS..."; rBtn.style.background = "#fbbc05";
+            rBtn.innerText = "WAITING FOR GPS..."; rBtn.style.background = "#fbbc05";
             requestWakeLock();
             watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, {
                 enableHighAccuracy: true, maximumAge: 0, timeout: 10000
@@ -897,7 +897,7 @@
             document.body.classList.remove('panic-mode');
             document.getElementById('partialLabel').innerText = "Distance to WP";
             speak("Please stay still to catch accuracy");
-            nBtn.innerText = "WAITING GPS..."; nBtn.style.background = "#fbbc05";
+            nBtn.innerText = "WAITING FOR GPS..."; nBtn.style.background = "#fbbc05";
             requestWakeLock();
             watchId = navigator.geolocation.watchPosition(updateStats, (err) => {}, {
                 enableHighAccuracy: true, maximumAge: 0, timeout: 10000
@@ -975,7 +975,22 @@
         const totalArea = document.getElementById('totalArea');
         let totalHoldTimer;
         if(totalArea) {
-            totalArea.onpointerdown = (e) => { if(currentMode === 'REC') { totalHoldTimer = setTimeout(() => { totalDist = 0; partialDist = 0; document.getElementById('total').innerText = "0.00"; document.getElementById('partial').innerText = "0.00"; speak("Total distance reset"); saveStateToVault(); }, 3000); } };
+            totalArea.onpointerdown = (e) => { 
+                if(currentMode === 'REC') { 
+                    totalHoldTimer = setTimeout(() => { 
+                        totalDist = 0; 
+                        partialDist = 0; 
+                        accumulatedTime = 0;
+                        sessionStartTime = Date.now();
+                        document.getElementById('total').innerText = "0.00"; 
+                        document.getElementById('partial').innerText = "0.00"; 
+                        document.getElementById('timer').innerText = "00:00:00";
+                        document.getElementById('speed').innerText = "0.0";
+                        speak("Total distance and timer reset"); 
+                        saveStateToVault(); 
+                    }, 3000); 
+                } 
+            };
             totalArea.onpointerup = () => clearTimeout(totalHoldTimer);
             totalArea.onpointerleave = () => clearTimeout(totalHoldTimer);
         }
