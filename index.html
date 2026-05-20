@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.40</title>
+    <title>StageMaster 4.50</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
-        .header h1 { margin: 10px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
+        .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
         .header h1 span { text-transform: lowercase; font-size: 1.2rem; }
-        .card { background: #2d2d2d; padding: 1rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; position: relative; z-index: 10; }
+        .card { background: #2d2d2d; padding: 0.8rem; border-radius: 20px; width: 94%; max-width: 450px; text-align: center; position: relative; z-index: 10; box-sizing: border-box; }
         
-        .mode-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 15px; }
+        .mode-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 10px; }
         .mode-btn { height: 45px; background: #3d3d3d; color: #888; border-radius: 12px; font-size: 0.8rem; border: 2px solid transparent; }
         .mode-btn.active { background: #bf953f; color: black; border-color: white; }
 
-        .metric { margin: 8px 0; padding: 10px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
+        .metric { margin: 6px 0; padding: 8px; border-radius: 15px; background: #3d3d3d; position: relative; overflow: hidden; }
         .total-box { border-left: 6px solid #ea4335; }
         .partial-box { border-left: 6px solid #1a73e8; background: #253b5e; }
         .go-flash { animation: flashing-green 0.5s infinite; }
@@ -24,19 +24,23 @@
         @keyframes panic-bg { 0% { background-color: #1a1a1a; } 50% { background-color: #7a1a1a; } 100% { background-color: #1a1a1a; } }
 
         .label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; }
-        .value { font-size: 4rem; font-weight: bold; font-family: monospace; line-height: 1; }
+        .value { font-size: 3.8rem; font-weight: bold; font-family: monospace; line-height: 1; }
         
         button { border: none; border-radius: 12px; cursor: pointer; font-weight: bold; text-transform: uppercase; touch-action: none; position: relative; overflow: hidden; }
-        .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 65px; width: 100%; margin-top: 10px; }
-        .stop-btn { background-color: #ea4335; color: white; font-size: 1.4rem; height: 65px; width: 100%; margin-top: 10px; }
-        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.6rem; height: 90px; width: 100%; margin-top: 10px; border-bottom: 5px solid #0d47a1; }
+        .start-btn { background-color: #34a853; color: white; font-size: 1.4rem; height: 60px; width: 100%; margin-top: 8px; }
+        .stop-btn { background-color: #ea4335; color: white; font-size: 1.4rem; height: 60px; width: 100%; margin-top: 8px; }
+        .reset-partial-btn { background-color: #1a73e8; color: white; font-size: 1.5rem; height: 80px; width: 100%; margin-top: 8px; border-bottom: 5px solid #0d47a1; }
         
-        .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; width: 100%; }
-        .wp-btn { height: 110px; background: #1a1a1a; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: none; }
+        .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; width: 100%; }
+        .wp-btn { height: 100px; background: #1a1a1a; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: none; }
         .progress-ring { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: conic-gradient(transparent 0deg, #444 0deg); z-index: 1; }
         .wp-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; background: #1a1a1a; border-radius: 50%; z-index: 2; }
-        .wp-btn img { width: 65px; height: 65px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
+        .wp-btn img { width: 55px; height: 55px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
         .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 3; }
+
+        /* Isolated Dynamic Tulip Box Structure */
+        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+        .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; }
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
@@ -59,7 +63,7 @@
 
     <div class="metric">
         <div class="label">Speed KM/H</div>
-        <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 5rem;">0</div>
+        <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 4.8rem;">0</div>
         <div id="accuracy" style="font-size: 0.7rem; padding: 4px 10px; border-radius: 10px; font-weight: bold; display: inline-block; background: #ea4335;">GPS: OFFLINE</div>
     </div>
 
@@ -78,8 +82,8 @@
     <button id="navToggleBtn" class="start-btn" style="display: none;">START NAVIGATION</button>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-        <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
-        <div style="background: #3d3d3d; padding: 10px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
+        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
+        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
@@ -102,7 +106,11 @@
         </button>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 15px;">version 4.40</div>
+    <div class="tulip-preview-container" id="tulipLiveBox">
+        <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
+    </div>
+
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 4.50</div>
 </div>
 
 <div id="reportModal">
@@ -141,7 +149,6 @@
     let rBtn = null;
     let nBtn = null;
 
-    // Advanced Absolute Displacement Model Variables (v4.28)
     let upstreamAnchor = null;
     let zeroSpeedAnchor = null;
     let wasSpeedZeroTriggered = false;
@@ -176,6 +183,42 @@
         if (clean.toUpperCase().startsWith('RP')) return clean.replace(/RP/i, 'Radio Point ');
         if (clean.toUpperCase().startsWith('S')) return clean.replace(/S/i, 'S ');
         return clean;
+    }
+
+    // High Precision Text-to-Image Link Harvester
+    function extractTulipImageUrl(descText) {
+        if (!descText) return null;
+        
+        // Match standard HTML img tags embedded by Google Earth/My Maps exports
+        const imgTagMatch = descText.match(/<img[^>]+src="([^">]+)"/i);
+        if (imgTagMatch && imgTagMatch[1]) return imgTagMatch[1];
+        
+        // Fallback: Match naked URL parameters that link to standard image extensions
+        const urlMatch = descText.match(/(https?:\/\/[^\s<>"]+\.(?:png|jpg|jpeg|gif|webp))/i);
+        if (urlMatch && urlMatch[1]) return urlMatch[1];
+        
+        return null;
+    }
+
+    // Clears or populates the graphic container safely
+    function renderTulipPreview(descText) {
+        const liveBox = document.getElementById('tulipLiveBox');
+        const liveImg = document.getElementById('tulipLiveImg');
+        
+        if (currentMode !== 'NAV' || !navStarted) {
+            liveBox.style.display = 'none';
+            liveImg.src = "";
+            return;
+        }
+
+        const imageUrl = extractTulipImageUrl(descText);
+        if (imageUrl) {
+            liveImg.src = imageUrl;
+            liveBox.style.display = 'flex';
+        } else {
+            liveBox.style.display = 'none';
+            liveImg.src = "";
+        }
     }
 
     function saveStateToVault() {
@@ -242,6 +285,9 @@
 
             if (navWaypoints.length > 0) {
                 updateTargetDisplay();
+                if (navStarted && navWaypoints[activeWpIndex]) {
+                    renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                }
             }
 
             if (currentMode === 'REC') {
@@ -289,9 +335,13 @@
         if (mode === 'REC') {
             rBtn.style.display = "block";
             nBtn.style.display = "none";
+            document.getElementById('tulipLiveBox').style.display = 'none';
         } else {
             rBtn.style.display = "none";
             nBtn.style.display = "block";
+            if (navStarted && navWaypoints[activeWpIndex]) {
+                renderTulipPreview(navWaypoints[activeWpIndex].desc);
+            }
         }
 
         if (mode === 'NAV' && isOffTrack) {
@@ -378,6 +428,7 @@
             zeroSpeedAnchor = null;
             wasSpeedZeroTriggered = false;
             isAustereLoopRunning = false;
+            document.getElementById('tulipLiveBox').style.display = 'none';
             nBtn.innerText = "START NAVIGATION"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
             document.body.classList.remove('panic-mode');
             updateTargetDisplay();
@@ -528,6 +579,9 @@
                     activeWpIndex = 0;
                 }
                 updateTargetDisplay();
+                if (navStarted && navWaypoints[activeWpIndex]) {
+                    renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                }
             }
 
             if (currentMode === 'REC' && trackPoints.length === 0) {
@@ -557,6 +611,9 @@
                     speak("The special stage has started");
                     activeWpIndex = 1;
                     updateTargetDisplay();
+                    if (navWaypoints[activeWpIndex]) {
+                        renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                    }
                 }
             }
 
@@ -616,7 +673,7 @@
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
                                 if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
-                                    triggerAustereAudioLoop();
+                                    triggerAustereLoopRunning();
                                 }
                             }
                         } else if (angleDiff < 90) {
@@ -680,7 +737,10 @@
                         
                         const distM = distToWp * 1000;
                         const cleanName = formatWpName(target.name);
-                        const tulipNote = target.desc ? `, ${target.desc}` : "";
+                        
+                        // Sanitize notes so raw image code loops aren't accidentally read by TTS engine
+                        const cleanNote = target.desc ? target.desc.replace(/<[^>]*>/g, '').trim() : "";
+                        const tulipNote = cleanNote ? `, ${cleanNote}` : "";
 
                         if (distM <= 2000 && distM > 1950 && !wpMarkersHit.p2km) {
                             speak("Approaching " + cleanName + " in 2 kilometers");
@@ -703,6 +763,7 @@
                             wpMarkersHit.p50 = true;
                         }
                         
+                        // Trigger exactly at the 35-meter Waypoint Arrival Fence
                         if (distM <= 35) {
                             speak("Arrived at " + cleanName + tulipNote);
                             
@@ -722,7 +783,10 @@
                             
                             updateTargetDisplay();
                             
+                            // Immediately load next waypoint's tulip graphic container
                             if (activeWpIndex < navWaypoints.length) {
+                                renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                                
                                 setTimeout(() => {
                                     let nextTarget = navWaypoints[activeWpIndex];
                                     let nextName = formatWpName(nextTarget.name);
@@ -802,9 +866,6 @@
         }, 1000);
     }
 
-    // ==========================================
-    // BUTTON HAT 1: REC MODE CONTROL SEQUENCE
-    // ==========================================
     rBtn = document.getElementById('recToggleBtn');
     rBtn.addEventListener('touchstart', (e) => {
         requestWakeLock();
@@ -827,14 +888,13 @@
                 if (p >= 100) { 
                     clearInterval(itv); 
                     wasLongPressTriggered = true;
-                    handleOpenSummaryModal(true); // Open summary pop-up but don't wipe data yet!
+                    handleOpenSummaryModal(true);
                 }
             }, 60);
 
             rBtn.addEventListener('touchend', () => { 
                 clearInterval(itv); 
                 if (!wasLongPressTriggered) {
-                    // BRIEF TAP DETECTED: Pause recording cleanly, drop tracking
                     rBtn.style.background = "#34a853";
                     rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn";
                     speak("RECORDING PAUSED");
@@ -856,9 +916,6 @@
         }
     });
 
-    // ==========================================
-    // BUTTON HAT 2: NAV MODE CONTROL SEQUENCE
-    // ==========================================
     nBtn = document.getElementById('navToggleBtn');
     nBtn.addEventListener('touchstart', (e) => {
         requestWakeLock();
@@ -904,11 +961,11 @@
         accuracyAchieved = false;
         stopWrongWayAudioLoop();
         document.body.classList.remove('panic-mode');
+        document.getElementById('tulipLiveBox').style.display = 'none';
         releaseWakeLock();
         saveStateToVault();
     }
 
-    // Opens the summary interface window safely without purging data lines
     function handleOpenSummaryModal(showModal) {
         speak("STOPPING AND PREVIEWING STAGE");
         if (sessionStartTime) {
@@ -931,7 +988,6 @@
     }
 
     function closeModalAndResumeRecording() {
-        // Safe Escape Hatch: Close pop-up window, retain data, toggle to resume state
         document.getElementById('reportModal').style.display = 'none'; 
         rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
         speak("Stage summary closed. Ready to resume recording.");
@@ -955,6 +1011,7 @@
         
         document.body.classList.remove('panic-mode');
         document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
+        document.getElementById('tulipLiveBox').style.display = 'none';
         releaseWakeLock();
         clearVault();
         if (showModal && currentMode === 'REC') {
@@ -1042,6 +1099,7 @@
                 document.getElementById('partial').innerText = "0.00";
                 document.getElementById('timer').innerText = "00:00:00";
                 document.getElementById('partialLabel').innerText = (currentMode === 'NAV') ? "Distance to WP" : "Partial KM";
+                document.getElementById('tulipLiveBox').style.display = 'none';
                 clearVault();
                 speak("TOTAL KILOMETERS AND TIMER RESET");
             }
@@ -1067,7 +1125,6 @@
         trackPoints.forEach(pt => { kml += `${pt.lon},${pt.lat},${pt.ele} `; });
         kml += `</coordinates></LineString></Placemark></Document></kml>`;
         
-        // Purge memory loops ONLY after file is generated
         totalDist = 0; partialDist = 0; accumulatedTime = 0;
         trackPoints = []; waypoints = []; globalWpCounter = 1;
         document.getElementById('total').innerText = "0.00";
@@ -1075,6 +1132,7 @@
         document.getElementById('timer').innerText = "00:00:00";
         rBtn.innerText = "START RECORDING"; rBtn.className = "start-btn"; rBtn.style.background = "#34a853";
         document.getElementById('reportModal').style.display = 'none';
+        document.getElementById('tulipLiveBox').style.display = 'none';
         clearVault();
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
