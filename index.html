@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 4.69</title>
+    <title>StageMaster 4.70</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 4.69</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 4.70</div>
 </div>
 
 <div id="reportModal">
@@ -646,10 +646,12 @@
                     if (navWaypoints[activeWpIndex]) {
                         renderTulipPreview(navWaypoints[activeWpIndex].desc);
                         
-                        // FIX: Calculate exact roadmap path distance and announce S1 immediately
-                        let nextWp = navWaypoints[activeWpIndex];
-                        partialDist = calculateHaverDist(latitude, longitude, nextWp.lat, nextWp.lon);
-                        let nextCleanName = formatWpName(nextWp.name);
+                        // FIX: Initialize partialDist using the path coordinates from start to S1
+                        let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                        let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                        partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
+                        
+                        let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
                         speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
                     }
                 }
@@ -832,7 +834,13 @@
                             clearedWpLon = target.lon;
 
                             activeWpIndex++;
-                            
+                            // FIX: Reset partial countdown along the path coordinates for the next upcoming waypoint
+                            if (navWaypoints[activeWpIndex]) {
+                                let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                                let nextWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                                partialDist = calculateDistanceAlongPath(currentPathIdx, nextWpPathIdx);
+                            }
+
                             wpMarkersHit.p2km = false;
                             wpMarkersHit.p1km = false;
                             wpMarkersHit.p500 = false;
