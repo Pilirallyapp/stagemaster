@@ -850,7 +850,7 @@
                             if (target.name.toUpperCase().includes("FLYING")) {
                                 activeWpIndex++;
                                 if (navWaypoints.length > 0) {
-                                    document.getElementById('importBtn').innerText = `COMPLETED: ${navWaypoints.length} / ${navWaypoints.length}`;
+                                    document.getElementById('loadKmlBtn').innerText = `COMPLETED: ${navWaypoints.length} / ${navWaypoints.length}`;
                                 }
                                 renderTulipPreview(""); // Allows background system to fetch flying.png
                                 setTimeout(() => {
