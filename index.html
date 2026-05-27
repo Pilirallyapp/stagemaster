@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.10</title>
+    <title>StageMaster 5.15</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.10</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.15</div>
 </div>
 
 <div id="reportModal">
@@ -139,7 +139,7 @@
     let lastOffTrackWarning = 0;
     let navStarted = false;
     let isOffTrack = false;
-    let wpMarkersHit = { p2km: false, p1km: false, p500: false, p200: false, p80: false };
+    let wpMarkersHit = { p2km: false, p1km: false, p500: false, p150: false, p50: false };
     let accuracyAchieved = false;
     let isManualPaused = false;
     
@@ -832,31 +832,24 @@
                             speak("500 meters" + tulipNote);
                             wpMarkersHit.p500 = true;
                         }
-                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p200) { 
+                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p150) { 
                             speak("Approaching " + cleanName + " in 200 meters" + tulipNote);
-                            wpMarkersHit.p200 = true;
+                            wpMarkersHit.p150 = true;
                         }
-                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p80) { 
+                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p50) { 
                             speak("80 meters");
-                            wpMarkersHit.p80 = true;
+                            wpMarkersHit.p50 = true;
                         }
                         
-                        // Check for standard arrival fence (35m) or Flying Finish gate fence (5m)
+                        // Set 5m fence for Flying Finish, keep 35m fence for standard waypoints
                         let targetFenceM = target.name.toUpperCase().includes("FLYING") ? 5 : 35;
 
                         if (distM <= targetFenceM) {
                             speak("Arrived at " + cleanName + tulipNote);
                             
                             if (target.name.toUpperCase().includes("FLYING")) {
-                                activeWpIndex++;
-                                if (navWaypoints.length > 0) {
-                                    document.getElementById('loadKmlBtn').innerText = `COMPLETED: ${navWaypoints.length} / ${navWaypoints.length}`;
-                                }
-                                renderTulipPreview(""); // Allows background system to fetch flying.png
-                                setTimeout(() => {
-                                    handleResetAndStop(false);
-                                    speak("Special Stage Finished");
-                                }, 3000);
+                                handleResetAndStop(false);
+                                speak("Special Stage Finished");
                                 return;
                             }
 
@@ -876,13 +869,10 @@
                             wpMarkersHit.p2km = false;
                             wpMarkersHit.p1km = false;
                             wpMarkersHit.p500 = false;
-                            wpMarkersHit.p200 = false;
-                            wpMarkersHit.p80 = false;
+                            wpMarkersHit.p150 = false;
+                            wpMarkersHit.p50 = false;
                             
                             updateTargetDisplay();
-
-                            // FORCE IMAGE LOCK: Freeze current tulip preview right now so updateTargetDisplay doesn't overwrite it immediately
-                            renderTulipPreview(navWaypoints[activeWpIndex] ? navWaypoints[activeWpIndex].desc : "");
                             
                             if (activeWpIndex < navWaypoints.length) {
                                 setTimeout(() => {
@@ -896,7 +886,7 @@
                                         wpMarkersHit.p500 = true; 
                                     }
                                     if (nextDistM <= 230 && nextDistM >= 190) {
-                                        wpMarkersHit.p200 = true;
+                                        wpMarkersHit.p150 = true;
                                     }
                                 }, 2500);
                             }
@@ -905,7 +895,6 @@
                 }
             }
         }
-    }
 
         if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
         
