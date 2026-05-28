@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.22</title>
+    <title>StageMaster 5.25</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -57,8 +57,8 @@
     </div>
 
     <div id="navControls" style="display: none; margin-bottom: 10px;">
-        <input type="file" id="kmlFileInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="startImport(event)">
-        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlFileInput').click(); return false;">IMPORT KML PATH</button>
+        <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="startImport(event)">
+        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
     </div>
 
     <div class="metric">
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.22</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.25</div>
 </div>
 
 <div id="reportModal">
@@ -241,21 +241,11 @@
         // Check if an image link is already embedded inside the KML description text
         let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
         
-       // AUTOMATED REPOSITORY FALLBACK: Fetch the image matching the frozen/active waypoint name
-if (!imageUrl) {
-    let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim().toLowerCase();
-    
-    // Get the file input using the updated ID
-    let fileInput = document.getElementById('kmlFileInput');
-    
-    if (fileInput && fileInput.files.length > 0) {
-        // Strip the extension from your clean filename (e.g., "27-5-long-tulip-drive.kml" -> "27-5-long-tulip-drive")
-        let repoName = fileInput.files[0].name.replace(/\.[^/.]+$/, "").toLowerCase();
-        
-        imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repoName}/main/${wpRawName}.png`;
-        console.log("Attempting to fetch:", imageUrl);
-    }
-}
+        // AUTOMATED REPOSITORY FALLBACK: Fetch the image matching the frozen/active waypoint name
+        if (!imageUrl) {
+            let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim().toLowerCase();
+            imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/27-5-long-tulip-drive/main/${wpRawName}.png`;
+        }
 
         if (imageUrl) {
             liveImg.src = imageUrl;
@@ -851,7 +841,10 @@ if (!imageUrl) {
                             wpMarkersHit.p50 = true;
                         }
                         
-                        if (distM <= 35) {
+                        // Set 5m fence for Flying Finish, keep 35m fence for standard waypoints
+                        let targetFenceM = target.name.toUpperCase().includes("FLYING") ? 5 : 35;
+
+                        if (distM <= targetFenceM) {
                             speak("Arrived at " + cleanName + tulipNote);
                             
                             if (target.name.toUpperCase().includes("FLYING")) {
