@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.28</title>
+    <title>StageMaster 5.30</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.28</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.30</div>
 </div>
 
 <div id="reportModal">
@@ -220,7 +220,7 @@
     
     if (currentMode !== 'NAV' || !navStarted) {
         liveBox.style.display = 'none';
-        liveImg.src = ""; // Clear src to prevent ghost loading
+        liveImg.src = "";
         return;
     }
 
@@ -235,9 +235,10 @@
         return;
     }
 
+    // 1. Try to get image from KML description first
     let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
 
-    // Generic Repo Fetch Logic
+    // 2. If no image, use the filename for repository fetching
     if (!imageUrl) {
         let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
         
@@ -247,13 +248,17 @@
             return;
         }
 
+        // Use loadedKmlName as is (minus the .kml suffix)
+        // No .replace() logic here, so it respects your exact naming
         let repo = (typeof loadedKmlName !== 'undefined') ? loadedKmlName.toLowerCase().replace(".kml", "") : "stagemaster";
-        // The hyphenation logic you requested
-        imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName.toLowerCase().replace(/\s+/g, '-')}.png`;
+        
+        // Construct the URL using the raw name exactly as it is found
+        imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
     }
 
-    // Safely update the image
+    // 3. Final display update
     if (imageUrl) {
+        liveImg.onerror = function() { liveBox.style.display = 'none'; };
         liveImg.src = imageUrl;
         liveBox.style.display = 'flex';
     } else {
