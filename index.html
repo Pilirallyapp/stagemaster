@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.27</title>
+    <title>StageMaster 5.28</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.27</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.28</div>
 </div>
 
 <div id="reportModal">
@@ -214,54 +214,53 @@
     }
 
     // Clears or populates the graphic container safely with 30m stay rule handling logic
-   function renderTulipPreview(descText) {
-        const liveBox = document.getElementById('tulipLiveBox');
-        const liveImg = document.getElementById('tulipLiveImg');
-        
-        if (currentMode !== 'NAV' || !navStarted) {
-            liveBox.style.display = 'none';
-            liveImg.src = "";
-            return;
-        }
-
-        // Determine which waypoint image to show based on your 30-meter freeze logic
-        let targetIndex = activeWpIndex;
-        
-        // If you cleared the waypoint and are within the 30m grace zone, keep showing the old image
-        if (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) {
-            targetIndex = clearedWpIndex;
-        }
-
-        if (!navWaypoints[targetIndex]) {
-            liveBox.style.display = 'none';
-            liveImg.src = "";
-            return;
-        }
-
-        // AUTOMATED REPOSITORY FALLBACK: Fetch the image from the dynamic repo name
-        if (!imageUrl) {
-            let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
-            
-            // Logic: If "NO S", hide the box and stop fetching
-            if (wpRawName.toUpperCase() === "NO S") {
-                liveBox.style.display = 'none';
-                liveImg.src = "";
-                return;
-            }
-            
-            // Use KML filename as repo name (dynamic)
-            let kmlRepo = loadedKmlName.toLowerCase().replace(".kml", "");
-            imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${kmlRepo}/main/${wpRawName.toLowerCase()}.png`;
-        }
-
-        if (imageUrl) {
-            liveImg.src = imageUrl;
-            liveBox.style.display = 'flex';
-        } else {
-            liveBox.style.display = 'none';
-            liveImg.src = "";
-        }
+  function renderTulipPreview(descText) {
+    const liveBox = document.getElementById('tulipLiveBox');
+    const liveImg = document.getElementById('tulipLiveImg');
+    
+    if (currentMode !== 'NAV' || !navStarted) {
+        liveBox.style.display = 'none';
+        liveImg.src = ""; // Clear src to prevent ghost loading
+        return;
     }
+
+    let targetIndex = activeWpIndex;
+    if (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) {
+        targetIndex = clearedWpIndex;
+    }
+
+    if (!navWaypoints[targetIndex]) {
+        liveBox.style.display = 'none';
+        liveImg.src = "";
+        return;
+    }
+
+    let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
+
+    // Generic Repo Fetch Logic
+    if (!imageUrl) {
+        let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
+        
+        if (wpRawName.toUpperCase() === "NO S") {
+            liveBox.style.display = 'none';
+            liveImg.src = "";
+            return;
+        }
+
+        let repo = (typeof loadedKmlName !== 'undefined') ? loadedKmlName.toLowerCase().replace(".kml", "") : "stagemaster";
+        // The hyphenation logic you requested
+        imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName.toLowerCase().replace(/\s+/g, '-')}.png`;
+    }
+
+    // Safely update the image
+    if (imageUrl) {
+        liveImg.src = imageUrl;
+        liveBox.style.display = 'flex';
+    } else {
+        liveBox.style.display = 'none';
+        liveImg.src = "";
+    }
+}
 
     function saveStateToVault() {
         const state = {
