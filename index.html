@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.30</title>
+    <title>StageMaster 5.35</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.30</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.35</div>
 </div>
 
 <div id="reportModal">
@@ -214,58 +214,50 @@
     }
 
     // Clears or populates the graphic container safely with 30m stay rule handling logic
-  function renderTulipPreview(descText) {
-    const liveBox = document.getElementById('tulipLiveBox');
-    const liveImg = document.getElementById('tulipLiveImg');
-    
-    if (currentMode !== 'NAV' || !navStarted) {
-        liveBox.style.display = 'none';
-        liveImg.src = "";
-        return;
-    }
-
-    let targetIndex = activeWpIndex;
-    if (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) {
-        targetIndex = clearedWpIndex;
-    }
-
-    if (!navWaypoints[targetIndex]) {
-        liveBox.style.display = 'none';
-        liveImg.src = "";
-        return;
-    }
-
-    // 1. Try to get image from KML description first
-    let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
-
-    // 2. If no image, use the filename for repository fetching
-    if (!imageUrl) {
-        let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
+   function renderTulipPreview(descText) {
+        const liveBox = document.getElementById('tulipLiveBox');
+        const liveImg = document.getElementById('tulipLiveImg');
         
-        if (wpRawName.toUpperCase() === "NO S") {
+        if (currentMode !== 'NAV' || !navStarted) {
             liveBox.style.display = 'none';
             liveImg.src = "";
             return;
         }
 
-        // Use loadedKmlName as is (minus the .kml suffix)
-        // No .replace() logic here, so it respects your exact naming
-        let repo = (typeof loadedKmlName !== 'undefined') ? loadedKmlName.toLowerCase().replace(".kml", "") : "stagemaster";
+        // Determine which waypoint image to show based on your 30-meter freeze logic
+        let targetIndex = activeWpIndex;
         
-        // Construct the URL using the raw name exactly as it is found
-        imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
-    }
+        // If you cleared the waypoint and are within the 30m grace zone, keep showing the old image
+        if (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) {
+            targetIndex = clearedWpIndex;
+        }
 
-    // 3. Final display update
-    if (imageUrl) {
-        liveImg.onerror = function() { liveBox.style.display = 'none'; };
-        liveImg.src = imageUrl;
-        liveBox.style.display = 'flex';
-    } else {
-        liveBox.style.display = 'none';
-        liveImg.src = "";
+        if (!navWaypoints[targetIndex]) {
+            liveBox.style.display = 'none';
+            liveImg.src = "";
+            return;
+        }
+
+        // Check if an image link is already embedded inside the KML description text
+        let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
+        
+        // AUTOMATED REPOSITORY FALLBACK: Fetch the image matching the frozen/active waypoint name
+        if (!imageUrl) {
+            // This extracts the name exactly as it is, preserving your capitalization
+            let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
+            // This constructs the URL using that name exactly
+            let repo = (typeof loadedKmlName !== 'undefined') ? loadedKmlName.replace(".kml", "") : "stagemaster";
+            imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
+        }
+
+        if (imageUrl) {
+            liveImg.src = imageUrl;
+            liveBox.style.display = 'flex';
+        } else {
+            liveBox.style.display = 'none';
+            liveImg.src = "";
+        }
     }
-}
 
     function saveStateToVault() {
         const state = {
