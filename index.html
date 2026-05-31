@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.38</title>
+    <title>StageMaster 5.39</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.38</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.39</div>
 </div>
 
 <div id="reportModal">
@@ -225,10 +225,7 @@
             return;
         }
 
-        // Determine which waypoint image to show based on your 30-meter freeze logic
         let targetIndex = activeWpIndex;
-        
-        // If you cleared the waypoint and are within the 30m grace zone, keep showing the old image
         if (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) {
             targetIndex = clearedWpIndex;
         }
@@ -239,23 +236,17 @@
             return;
         }
 
-        // Check if an image link is already embedded inside the KML description text
         let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
         
-       // AUTOMATED REPOSITORY FETCH: Fetch the image matching the active waypoint name
         if (!imageUrl) {
-            // DEBUG: This will pop up on your phone screen to show you exactly what the filename is
-            if (typeof loadedKmlName !== 'undefined') {
-                alert("DEBUG: Filename detected is " + loadedKmlName);
-            }
-            
             let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
             
-            // Generic: Use the filename (minus .kml) as the repository name
             if (typeof loadedKmlName !== 'undefined' && loadedKmlName) {
-                // We split by '/' to ensure we only get the filename, ignoring any folders
                 let repo = loadedKmlName.split('/').pop().replace(".kml", "").trim();
                 imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
+                
+                // URL DEBUG: This shows exactly what URL is being attempted
+                alert("DEBUG: Attempting to fetch URL: " + imageUrl);
             }
         }
 
