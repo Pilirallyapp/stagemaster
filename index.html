@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.39</title>
+    <title>StageMaster 5.40</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.39</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.40</div>
 </div>
 
 <div id="reportModal">
@@ -245,8 +245,6 @@
                 let repo = loadedKmlName.split('/').pop().replace(".kml", "").trim();
                 imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
                 
-                // URL DEBUG: This shows exactly what URL is being attempted
-                alert("DEBUG: Attempting to fetch URL: " + imageUrl);
             }
         }
 
@@ -417,10 +415,8 @@
         const file = event.target.files[0];
         if (!file) return;
 
-        // DEBUG & ASSIGNMENT: Assign file name and show alert immediately
         loadedKmlName = file.name;
-        alert("DEBUG: File assigned. Filename is: " + loadedKmlName);
-
+        
         const reader = new FileReader();
         reader.onload = function(e) {
             const parser = new DOMParser();
