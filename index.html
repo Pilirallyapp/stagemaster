@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.41</title>
+    <title>StageMaster 5.42</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -62,13 +62,6 @@
         <button id="purgeBtn" class="stop-btn" style="background-color: #7a1a1a; height: 40px; font-size: 0.9rem;" onclick="showPurgeConfirm()">PURGE VAULT</button>
     </div>
 
-    <div id="purgeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20000; justify-content: center; align-items: center;">
-        <div class="modal-content">
-            <div style="color: white; margin-bottom: 20px;">Clear all saved route memory and return to a clean state?</div>
-            <button style="background: #ea4335; color: white; padding: 15px 30px; margin-right: 10px;" onclick="confirmPurge()">YES, PURGE</button>
-            <button style="background: #555; color: white; padding: 15px 30px;" onclick="document.getElementById('purgeModal').style.display='none'">CANCEL</button>
-        </div>
-
     <div class="metric">
         <div class="label">Speed KM/H</div>
         <div id="currSpeed" class="value" style="color:#fbbc05; font-size: 4.8rem;">0</div>
@@ -118,7 +111,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.41</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.42</div>
 </div>
 
 <div id="reportModal">
@@ -368,27 +361,8 @@
         }
     }
 
-    function showPurgeConfirm() {
-        document.getElementById('purgeModal').style.display = 'flex';
-    }
-
-    function confirmPurge() {
-        // Clear all local storage
-        localStorage.clear();
-        
-        // Reset primary app variables to zero
-        totalDist = 0;
-        partialDist = 0;
-        accumulatedTime = 0;
-        trackPoints = [];
-        waypoints = [];
-        globalWpCounter = 1;
-        
-        // Hide the modal
-        document.getElementById('purgeModal').style.display = 'none';
-        
-        // Force a full reload to clear all cached state from the browser RAM
-        location.reload();
+    function clearVault() {
+        localStorage.removeItem('stagemaster_vault');
     }
 
     function switchMode(mode) {
@@ -1259,6 +1233,23 @@
         clearVault();
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
-</script>
+<script>
+        function showPurgeConfirm() {
+            document.getElementById('purgeModal').style.display = 'flex';
+        }
+
+        function confirmPurge() {
+            localStorage.clear();
+            location.reload();
+        }
+    </script>
+
+    <div id="purgeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 20000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
+        <div style="background: #2d2d2d; padding: 25px; border-radius: 25px; border: 2px solid #ea4335; text-align: center;">
+            <div style="color: white; margin-bottom: 20px; font-size: 1.2rem;">Clear all saved route memory and return to a clean state?</div>
+            <button style="background: #ea4335; color: white; padding: 15px 30px; margin-right: 10px; border-radius: 12px; font-weight: bold; border: none;" onclick="confirmPurge()">YES, PURGE</button>
+            <button style="background: #555; color: white; padding: 15px 30px; border-radius: 12px; font-weight: bold; border: none;" onclick="document.getElementById('purgeModal').style.display='none'">CANCEL</button>
+        </div>
+    </div>
 </body>
 </html>
