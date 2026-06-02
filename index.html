@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.43</title>
+    <title>StageMaster 5.45</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -58,8 +58,7 @@
 
     <div id="navControls" style="display: none; margin-bottom: 10px;">
         <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="startImport(event)">
-        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem; margin-bottom: 10px;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
-        <button id="purgeBtn" class="stop-btn" style="background-color: #7a1a1a; height: 40px; font-size: 0.9rem;" onclick="showPurgeConfirm()">PURGE VAULT</button>
+        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
     </div>
 
     <div class="metric">
@@ -111,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.43</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.45</div>
 </div>
 
 <div id="reportModal">
@@ -412,86 +411,99 @@
         speak(mode === 'REC' ? "Recording mode" : "Navigation mode");
     }
 
-    function startImport(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+    async function startImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
 
-        loadedKmlName = file.name;
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
-            navWaypoints = [];
-            navPathCoords = [];
+            loadedKmlName = file.name;
+            const btn = document.getElementById('importBtn');
+            btn.innerText = "PRE-LOADING...";
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+                navWaypoints = [];
+                navPathCoords = [];
 
-            const placemarks = xmlDoc.getElementsByTagName("Placemark");
-            for (let i = 0; i < placemarks.length; i++) {
-                const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
-                const descNode = placemarks[i].getElementsByTagName("description")[0];
-                const description = descNode ? descNode.textContent.trim() : "";
+                const placemarks = xmlDoc.getElementsByTagName("Placemark");
+                for (let i = 0; i < placemarks.length; i++) {
+                    const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
+                    const descNode = placemarks[i].getElementsByTagName("description")[0];
+                    const description = descNode ? descNode.textContent.trim() : "";
+                    
+                    const point = placemarks[i].getElementsByTagName("Point")[0];
+                    if (point) {
+                        const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
+                        navWaypoints.push({ name: name, desc: description, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
+                    }
+
+                    const line = placemarks[i].getElementsByTagName("LineString")[0];
+                    if (line) {
+                        const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                        pts.forEach(p => {
+                            if (p.trim()) {
+                                const c = p.split(",");
+                                navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                            }
+                        });
+                    }
+                }
+
+                if (navPathCoords.length === 0) {
+                    const globalLines = xmlDoc.getElementsByTagName("LineString");
+                    for (let j = 0; j < globalLines.length; j++) {
+                        const pts = globalLines[j].getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                        pts.forEach(p => {
+                            if (p.trim()) {
+                                const c = p.split(",");
+                                navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                            }
+                        });
+                    }
+                }
+
+                // PRE-FLIGHT CACHING: Fetch images now before allowing navigation
+                const baseUrl = "https://github.com/pantelis/images/raw/main/";
+                const imageUrls = navWaypoints.map(wp => `${baseUrl}${wp.name}.jpg`);
                 
-                const point = placemarks[i].getElementsByTagName("Point")[0];
-                if (point) {
-                    const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
-                    navWaypoints.push({ 
-                        name: name, 
-                        desc: description, 
-                        lon: parseFloat(coords[0]), 
-                        lat: parseFloat(coords[1]) 
+                await Promise.all(imageUrls.map(url => {
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        img.src = url;
                     });
-                }
+                }));
 
-                const line = placemarks[i].getElementsByTagName("LineString")[0];
-                if (line) {
-                    const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
-                    pts.forEach(p => {
-                        if (p.trim()) {
-                            const c = p.split(",");
-                            navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
-                        }
-                    });
-                }
-            }
-
-            if (navPathCoords.length === 0) {
-                const globalLines = xmlDoc.getElementsByTagName("LineString");
-                for (let j = 0; j < globalLines.length; j++) {
-                    const pts = globalLines[j].getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
-                    pts.forEach(p => {
-                        if (p.trim()) {
-                            const c = p.split(",");
-                            navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
-                        }
-                    });
-                }
-            }
-
-            document.getElementById('importBtn').style.backgroundColor = "#34a853";
-            document.getElementById('importBtn').innerText = "LOADED: " + navWaypoints.length + " WP";
-            activeWpIndex = 0;
-            navStarted = false;
-            accuracyAchieved = false;
-            isManualPaused = false;
-            isOffTrack = false;
-            offTrackAnchor = null;
-            stopWrongWayAudioLoop();
-            upstreamAnchor = null;
-            zeroSpeedAnchor = null;
-            wasSpeedZeroTriggered = false;
-            isAustereLoopRunning = false;
-            clearedWpIndex = null;
-            clearedWpLat = null;
-            clearedWpLon = null;
-            document.getElementById('tulipLiveBox').style.display = 'none';
-            nBtn.innerText = "START NAVIGATION"; nBtn.className = "start-btn"; nBtn.style.background = "#34a853";
-            document.body.classList.remove('panic-mode');
-            updateTargetDisplay();
-            saveStateToVault();
-            speak(navWaypoints.length + " waypoints UPLOADED.");
-        };
-        reader.readAsText(file);
-    }
+                // Reset state
+                activeWpIndex = 0;
+                navStarted = false;
+                accuracyAchieved = false;
+                isManualPaused = false;
+                isOffTrack = false;
+                offTrackAnchor = null;
+                stopWrongWayAudioLoop();
+                upstreamAnchor = null;
+                zeroSpeedAnchor = null;
+                wasSpeedZeroTriggered = false;
+                isAustereLoopRunning = false;
+                clearedWpIndex = null;
+                clearedWpLat = null;
+                clearedWpLon = null;
+                
+                document.getElementById('tulipLiveBox').style.display = 'none';
+                document.body.classList.remove('panic-mode');
+                updateTargetDisplay();
+                saveStateToVault();
+                
+                window.appIsReady = true;
+                btn.style.backgroundColor = "#34a853";
+                btn.innerText = "READY: " + navWaypoints.length + " WP";
+                speak(navWaypoints.length + " waypoints READY.");
+            };
+            reader.readAsText(file);
+        }
 
     function updateTargetDisplay() {
         if (currentMode !== 'NAV') return;
@@ -1014,6 +1026,11 @@
             accuracyAchieved = false;
             isManualPaused = false;
             
+            // GATEKEEPER CHECK: Ensure route is pre-loaded before starting
+            if (!window.appIsReady) {
+                speak("Route not loaded. Wait for READY status.");
+                return;
+            }
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
             nBtn.innerText = "PAUSE NAV"; nBtn.className = "stop-btn"; nBtn.style.background = "#ea4335";
             speak("Waiting for GPS accuracy");
@@ -1233,22 +1250,6 @@
         clearVault();
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
-function showPurgeConfirm() {
-            document.getElementById('purgeModal').style.display = 'flex';
-        }
-
-        function confirmPurge() {
-            localStorage.clear();
-            location.reload();
-        }
-    </script>
-
-    <div id="purgeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 20000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
-        <div style="background: #2d2d2d; padding: 25px; border-radius: 25px; border: 2px solid #ea4335; text-align: center;">
-            <div style="color: white; margin-bottom: 20px; font-size: 1.2rem;">Clear all saved route memory and return to a clean state?</div>
-            <button style="background: #ea4335; color: white; padding: 15px 30px; margin-right: 10px; border-radius: 12px; font-weight: bold; border: none;" onclick="confirmPurge()">YES, PURGE</button>
-            <button style="background: #555; color: white; padding: 15px 30px; border-radius: 12px; font-weight: bold; border: none;" onclick="document.getElementById('purgeModal').style.display='none'">CANCEL</button>
-        </div>
-    </div>
+</script>
 </body>
 </html>
