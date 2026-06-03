@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.45</title>
+    <title>StageMaster 5.46</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.45</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.46</div>
 </div>
 
 <div id="reportModal">
@@ -675,7 +675,7 @@
                 document.getElementById('partial').innerText = distToStartGate.toFixed(2);
                 document.getElementById('total').innerText = "0.00";
                 
-                if (distToStartGate <= 0.005) { 
+                if (distToStartGate <= 0.015) { 
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
