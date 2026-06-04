@@ -821,7 +821,7 @@
                     }
                 }
 
-                // --- MATH ENGINE: Always active ---
+               // --- MATH ENGINE: Always active ---
 const target = navWaypoints[activeWpIndex];
 if (target) {
     let spatialDeltaKM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
@@ -830,7 +830,7 @@ if (target) {
     document.getElementById('partial').innerText = partialDist.toFixed(2);
 }
 
-// --- ALERT ENGINE: Only active when on-track ---
+// --- ALERT ENGINE: Wrapped in the original logic structure ---
 if (!isOffTrack && !isWrongWay) {
     if (target) {
         const distM = partialDist * 1000;
