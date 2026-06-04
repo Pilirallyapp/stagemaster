@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.48</title>
+    <title>StageMaster 5.46</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.48</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.46</div>
 </div>
 
 <div id="reportModal">
@@ -615,39 +615,347 @@
             let timeDeltaSec = (Date.now() - lastCoords.time) / 1000;
             let spatialDeltaKM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
             let mathematicalSpeed = timeDeltaSec > 0 ? (spatialDeltaKM / (timeDeltaSec / 3600)) : 0;
-            if (mathematicalSpeed > 160 || (curSpeed === 0 && mathematicalSpeed > 6 && timeDeltaSec < 3)) return; 
+            
+            if (mathematicalSpeed > 160 || (curSpeed === 0 && mathematicalSpeed > 6 && timeDeltaSec < 3)) {
+                return; 
+            }
         }
 
         const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
+        
         accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
         accEl.style.background = accuracy < 15 ? "#34a853" : "#ea4335";
         currSpeedEl.innerText = Math.round(curSpeed);
         
-        if (currentMode === 'NAV' && navStarted) {
-            let currentPathIdx = findClosestPathIndex(latitude, longitude);
-            let finishPathIdx = navPathCoords.length - 1;
-            document.getElementById('total').innerText = calculateDistanceAlongPath(currentPathIdx, finishPathIdx).toFixed(2);
+        if (watchId && Math.random() < 0.1) { requestWakeLock(); }
 
-            const target = navWaypoints[activeWpIndex];
-            if (target) {
-                let spatialDeltaKM = calculateHaverDist(lastCoords ? lastCoords.lat : latitude, lastCoords ? lastCoords.lon : longitude, latitude, longitude);
-                partialDist -= spatialDeltaKM;
-                if (partialDist < 0) partialDist = 0;
-                document.getElementById('partial').innerText = partialDist.toFixed(2);
+        if (isWaitingForAccuracy && accuracy <= 10) {
+            isWaitingForAccuracy = false; 
+            accuracyAchieved = true;
+            speak("Now you can go!");
+            document.getElementById('totalArea').classList.add('go-flash');
+            setTimeout(() => document.getElementById('totalArea').classList.remove('go-flash'), 5000);
+            
+            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+            
+            if (currentMode === 'NAV' && navWaypoints.length > 0) {
+                if (navStarted) {
+                    activeWpIndex = findForwardNearestWaypointIndex(latitude, longitude);
+                } else {
+                    activeWpIndex = 0;
+                }
+                updateTargetDisplay();
+                if (navStarted) {
+                    if (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) {
+                        renderTulipPreview(navWaypoints[clearedWpIndex].desc);
+                    } else if (navWaypoints[activeWpIndex]) {
+                        renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                    }
+                }
+            }
+
+            if (currentMode === 'REC' && trackPoints.length === 0) {
+                sessionStartTime = Date.now(); 
+                startTimer();
+                mark('start');
+            } else if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
+                sessionStartTime = Date.now();
+                startTimer();
+            }
+            saveStateToVault();
+            return;
+        }
+
+        if (currentMode === 'NAV' && navWaypoints.length > 0 && accuracyAchieved) {
+            const startPoint = navWaypoints[0];
+            const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
+
+            if (!navStarted) {
+                document.getElementById('partial').innerText = distToStartGate.toFixed(2);
+                document.getElementById('total').innerText = "0.00";
+                
+                if (distToStartGate <= 0.015) { 
+                    navStarted = true;
+                    sessionStartTime = Date.now();
+                    startTimer();
+                    speak("The special stage has started");
+                    activeWpIndex = 1;
+                    updateTargetDisplay();
+                    if (navWaypoints[activeWpIndex]) {
+                        renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                        
+                        // FIX: Initialize partialDist using the path coordinates from start to S1
+                        let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                        let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                        partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
+                        
+                        let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
+                        speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
+                    }
+                }
+            }
+
+            if (navStarted) {
+                let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                let finishPathIdx = navPathCoords.length - 1;
+                let trackDistanceToFinish = calculateDistanceAlongPath(currentPathIdx, finishPathIdx);
+                document.getElementById('total').innerText = trackDistanceToFinish.toFixed(2);
+
+                let minPathDist = 999;
+                for (let pt of navPathCoords) {
+                    let d = calculateHaverDist(latitude, longitude, pt.lat, pt.lon);
+                    if (d < minPathDist) minPathDist = d;
+                }
+
+                if (minPathDist <= 0.035 && !isOffTrack && lastCoords) {
+                    let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
+                    let angleDiff = 0;
+                    
+                    if (currentPathIdx !== nextPathIdx) {
+                        let dyTrack = navPathCoords[nextPathIdx].lat - navPathCoords[currentPathIdx].lat;
+                        let dxTrack = navPathCoords[nextPathIdx].lon - navPathCoords[currentPathIdx].lon;
+                        let trackBearing = Math.atan2(dyTrack, dxTrack) * 180 / Math.PI;
+
+                        let dyUser = latitude - lastCoords.lat;
+                        let dxUser = longitude - lastCoords.lon;
+                        let userBearing = Math.atan2(dyUser, dxUser) * 180 / Math.PI;
+
+                        angleDiff = Math.abs(userBearing - trackBearing);
+                        if (angleDiff > 180) angleDiff = 360 - angleDiff;
+                    }
+
+                    if (curSpeed < 1.0) {
+                        if (isWrongWay && !wasSpeedZeroTriggered) {
+                            if (wrongWayInterval) {
+                                clearInterval(wrongWayInterval);
+                                wrongWayInterval = null;
+                            }
+                            speak("WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY"); 
+                            wasSpeedZeroTriggered = true;
+                            zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
+                        }
+                    } else {
+                        if (angleDiff > 135) {
+                            if (!isWrongWay) {
+                                if (!upstreamAnchor) {
+                                    upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
+                                }
+                                let displacementM = calculateHaverDist(upstreamAnchor.lat, upstreamAnchor.lon, latitude, longitude) * 1000;
+                                if (displacementM >= 20) { 
+                                    isWrongWay = true;
+                                    wasSpeedZeroTriggered = false;
+                                    document.body.classList.add('panic-mode');
+                                    document.getElementById('partialLabel').innerText = "WRONG WAY!";
+                                    triggerWrongWayAudioLoop();
+                                }
+                            } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
+                                let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
+                                if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
+                                    triggerAustereLoopRunning();
+                                }
+                            }
+                        } else if (angleDiff < 90) {
+                            upstreamAnchor = null; 
+                            
+                            if (isWrongWay) {
+                                if (wrongWayInterval) {
+                                    clearInterval(wrongWayInterval);
+                                    wrongWayInterval = null;
+                                }
+                                wasSpeedZeroTriggered = false;
+                                if (!zeroSpeedAnchor) {
+                                    zeroSpeedAnchor = { lat: latitude, lon: longitude };
+                                }
+                                let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
+                                if (recoveryDisplacementM >= 20) { 
+                                    stopWrongWayAudioLoop();
+                                    document.body.classList.remove('panic-mode');
+                                    document.getElementById('partialLabel').innerText = "Distance to WP";
+                                    announceCorrectDirectionDouble();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (minPathDist > 0.08) { 
+                    if (isWrongWay) stopWrongWayAudioLoop(); 
+                    
+                    if (!isOffTrack) { 
+                        isOffTrack = true; 
+                        document.body.classList.add('panic-mode'); 
+                        document.getElementById('partialLabel').innerText = "Return to Track (Meters)";
+                        offTrackAnchor = { lat: latitude, lon: longitude }; 
+                    }
+                }
+
+                if (isOffTrack) {
+                    let currentActualDistM = minPathDist * 1000;
+                    document.getElementById('partial').innerText = "-" + Math.round(currentActualDistM);
+
+                    if (Date.now() - lastOffTrackWarning > 10000 && !isWrongWay) {
+                        speak("You are off course, return back");
+                        lastOffTrackWarning = Date.now();
+                    }
+
+                    if (minPathDist < 0.01) { 
+                        isOffTrack = false;
+                        offTrackAnchor = null;
+                        document.body.classList.remove('panic-mode');
+                        document.getElementById('partialLabel').innerText = "Distance to WP";
+                        announceBackOnTrackDouble(); 
+                    }
+                }
+
+                // 30-Meter Stay-on-Screen Evaluation Framework
+                if (clearedWpIndex !== null && clearedWpLat !== null && clearedWpLon !== null) {
+                    let distanceFromClearedM = calculateHaverDist(latitude, longitude, clearedWpLat, clearedWpLon) * 1000;
+                    if (distanceFromClearedM >= 30) {
+                        clearedWpIndex = null;
+                        clearedWpLat = null;
+                        clearedWpLon = null;
+                        if (activeWpIndex < navWaypoints.length) {
+                            renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                        }
+                    }
+                }
+
+                if (!isOffTrack && !isWrongWay) {
+                    const target = navWaypoints[activeWpIndex];
+                    if (target) {
+                        // FIX: Replicate total distance logic by subtracting driven movement along the path step-by-step
+                        let spatialDeltaKM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
+                        partialDist -= spatialDeltaKM;
+                        if (partialDist < 0) partialDist = 0;
+                        const distToWp = partialDist;
+                        document.getElementById('partial').innerText = distToWp.toFixed(2);
+                        
+                        const distM = distToWp * 1000;
+                        const cleanName = formatWpName(target.name);
+                        
+                        const cleanNote = target.desc ? target.desc.replace(/<[^>]*>/g, '').trim() : "";
+                        const tulipNote = cleanNote ? `, ${cleanNote}` : "";
+
+                        if (distM <= 2000 && distM > 1950 && !wpMarkersHit.p2km) {
+                            speak("Approaching " + cleanName + " in 2 kilometers");
+                            wpMarkersHit.p2km = true;
+                        }
+                        if (distM <= 1000 && distM > 950 && !wpMarkersHit.p1km) {
+                            speak("Approaching " + cleanName + " in 1 kilometer");
+                            wpMarkersHit.p1km = true;
+                        }
+                        if (distM <= 500 && distM > 450 && !wpMarkersHit.p500) { 
+                            speak("500 meters" + tulipNote);
+                            wpMarkersHit.p500 = true;
+                        }
+                        if (distM <= 200 && distM > 190 && !wpMarkersHit.p150) { 
+                            speak("Approaching " + cleanName + " in 200 meters" + tulipNote);
+                            wpMarkersHit.p150 = true;
+                        }
+                        if (distM <= 80 && distM > 70 && !wpMarkersHit.p50) { 
+                            speak("80 meters");
+                            wpMarkersHit.p50 = true;
+                        }
+                        
+                        if (distM <= 35) {
+                            speak("Arrived at " + cleanName + tulipNote);
+                            
+                            if (target.name.toUpperCase().includes("FLYING")) {
+                                handleResetAndStop(false);
+                                speak("Special Stage Finished");
+                                return;
+                            }
+
+                            // Capture coordinates and index to pin image to panel for 30m before updating visual asset
+                            clearedWpIndex = activeWpIndex;
+                            clearedWpLat = target.lat;
+                            clearedWpLon = target.lon;
+
+                            activeWpIndex++;
+                            // FIX: Reset partial countdown along the path coordinates for the next upcoming waypoint
+                            if (navWaypoints[activeWpIndex]) {
+                                let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                                let nextWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                                partialDist = calculateDistanceAlongPath(currentPathIdx, nextWpPathIdx);
+                            }
+
+                            wpMarkersHit.p2km = false;
+                            wpMarkersHit.p1km = false;
+                            wpMarkersHit.p500 = false;
+                            wpMarkersHit.p150 = false;
+                            wpMarkersHit.p50 = false;
+                            
+                            updateTargetDisplay();
+                            
+                            if (activeWpIndex < navWaypoints.length) {
+                                setTimeout(() => {
+                                    let nextTarget = navWaypoints[activeWpIndex];
+                                    let nextName = formatWpName(nextTarget.name);
+                                    let nextDist = calculateHaverDist(latitude, longitude, nextTarget.lat, nextTarget.lon);
+                                    speak("Distance to " + nextName + " is " + nextDist.toFixed(2) + " kilometers");
+                                    
+                                    let nextDistM = nextDist * 1000;
+                                    if (nextDistM <= 530 && nextDistM >= 450) {
+                                        wpMarkersHit.p500 = true; 
+                                    }
+                                    if (nextDistM <= 230 && nextDistM >= 190) {
+                                        wpMarkersHit.p150 = true;
+                                    }
+                                }, 2500);
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        if (lastCoords) {
-            const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
-            if (d > 0.002) {
-                if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) totalDist += d;
-                trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
-                lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+        if (isWaitingForAccuracy || !watchId || accuracy > 40) return;
+        
+        if (curSpeed < 1.0) {
+            resumeStrikeStartTime = null;
+            if (!isAutoPaused && !stopTimeStart) stopTimeStart = Date.now();
+            if (!isAutoPaused && stopTimeStart && (Date.now() - stopTimeStart > 60000)) {
+                isAutoPaused = true; speak("Paused");
+                if (navStarted && sessionStartTime) accumulatedTime += (Date.now() - sessionStartTime);
+                clearInterval(timerInterval); releaseWakeLock();
                 saveStateToVault();
             }
-        } else {
+        } else if (curSpeed >= 2.0) {
+            stopTimeStart = null;
+            if (isAutoPaused) {
+                if (!resumeStrikeStartTime) resumeStrikeStartTime = Date.now();
+                if (Date.now() - resumeStrikeStartTime >= 3000) {
+                    isAutoPaused = false; speak("Resumed");
+                    if (navStarted) {
+                        sessionStartTime = Date.now(); 
+                        startTimer(); 
+                    }
+                    requestWakeLock();
+                    saveStateToVault();
+                }
+            }
+        }
+
+        if (isAutoPaused || !lastCoords) return;
+        const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
+        if (d > 0.002) {
+            if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
+                totalDist += d; partialDist += d;
+            }
+            if (currentMode === 'REC') {
+                document.getElementById('total').innerText = totalDist.toFixed(2);
+                document.getElementById('partial').innerText = partialDist.toFixed(2);
+            }
+            if (navStarted || currentMode === 'REC') {
+                const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+                if (elapsed > 0) {
+                    document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
+                }
+            }
+            trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
             lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+            saveStateToVault();
         }
     }
 
