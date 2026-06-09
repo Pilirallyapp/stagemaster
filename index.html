@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.52</title>
+    <title>StageMaster 5.53</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.52</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.53</div>
 </div>
 
 <div id="reportModal">
@@ -665,27 +665,31 @@
             const startPoint = navWaypoints[0];
             const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
 
-            if (!navStarted) {
+           if (!navStarted) {
+                // Keep the display updating so you see distance-to-start
                 document.getElementById('partial').innerText = distToStartGate.toFixed(2);
                 document.getElementById('total').innerText = "0.00";
                 
-                if (distToStartGate <= 0.015) { 
+                // FORCE START: Even if GPS jumps, we allow starting by proximity 
+                // or simply manual entry if you are already in the stage.
+                if (distToStartGate <= 0.050 || (currentMode === 'NAV' && navWaypoints.length > 0)) { 
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
                     speak("The special stage has started");
                     activeWpIndex = 1;
                     updateTargetDisplay();
+                    
                     if (navWaypoints[activeWpIndex]) {
                         renderTulipPreview(navWaypoints[activeWpIndex].desc);
                         
-                        // FIX: Initialize partialDist using the path coordinates from start to S1
+                        // Set initial partial distance
                         let currentPathIdx = findClosestPathIndex(latitude, longitude);
                         let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                         
                         let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
-                        speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
+                        speak("Navigation active. Next waypoint, " + nextCleanName);
                     }
                 }
             }
