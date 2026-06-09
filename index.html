@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.53</title>
+    <title>StageMaster 5.54</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.53</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.54</div>
 </div>
 
 <div id="reportModal">
@@ -670,9 +670,9 @@
                 document.getElementById('partial').innerText = distToStartGate.toFixed(2);
                 document.getElementById('total').innerText = "0.00";
                 
-                // FORCE START: Even if GPS jumps, we allow starting by proximity 
-                // or simply manual entry if you are already in the stage.
-                if (distToStartGate <= 0.050 || (currentMode === 'NAV' && navWaypoints.length > 0)) { 
+                // ONLY trigger if we are within 50 meters (0.050) of the start gate.
+                // This removes the "Instant-Start" override that made you Flash Gordon.
+                if (distToStartGate <= 0.050) { 
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
@@ -683,7 +683,6 @@
                     if (navWaypoints[activeWpIndex]) {
                         renderTulipPreview(navWaypoints[activeWpIndex].desc);
                         
-                        // Set initial partial distance
                         let currentPathIdx = findClosestPathIndex(latitude, longitude);
                         let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
