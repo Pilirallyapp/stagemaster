@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.56</title>
+    <title>StageMaster 5.57</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.56</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.57</div>
 </div>
 
 <div id="reportModal">
@@ -611,13 +611,15 @@
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
-        // GPS TRUST OVERRIDE: No longer filtering based on accuracy or speed logic.
-        // The app will now update the UI on every valid GPS pulse.
+        // GPS TRUST OVERRIDE: Remove all accuracy/speed gates
+        // This keeps the function running and the UI responsive
         const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
-        accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
-        accEl.style.background = accuracy < 25 ? "#34a853" : "#ea4335";
-        currSpeedEl.innerText = Math.round(curSpeed);
+        if (currSpeedEl && accEl) {
+            accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
+            accEl.style.background = accuracy < 25 ? "#34a853" : "#ea4335";
+            currSpeedEl.innerText = Math.round(curSpeed);
+        }
 
         const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
