@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.55</title>
+    <title>StageMaster 5.56</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.55</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.56</div>
 </div>
 
 <div id="reportModal">
@@ -611,11 +611,13 @@
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
-      // GPS TRUST OVERRIDE: Trust every pulse, no matter the accuracy or speed
-        if (!lastCoords) {
-            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-            return;
-        }
+        // GPS TRUST OVERRIDE: No longer filtering based on accuracy or speed logic.
+        // The app will now update the UI on every valid GPS pulse.
+        const currSpeedEl = document.getElementById('currSpeed');
+        const accEl = document.getElementById('accuracy');
+        accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
+        accEl.style.background = accuracy < 25 ? "#34a853" : "#ea4335";
+        currSpeedEl.innerText = Math.round(curSpeed);
 
         const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
@@ -667,30 +669,27 @@
             const startPoint = navWaypoints[0];
             const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
 
-           if (!navStarted) {
-                // Keep the display updating so you see distance-to-start
+            if (!navStarted) {
                 document.getElementById('partial').innerText = distToStartGate.toFixed(2);
                 document.getElementById('total').innerText = "0.00";
                 
-                // ONLY trigger if we are within 50 meters (0.050) of the start gate.
-                // This removes the "Instant-Start" override that made you Flash Gordon.
-                if (distToStartGate <= 0.050) { 
+                if (distToStartGate <= 0.015) { 
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
                     speak("The special stage has started");
                     activeWpIndex = 1;
                     updateTargetDisplay();
-                    
                     if (navWaypoints[activeWpIndex]) {
                         renderTulipPreview(navWaypoints[activeWpIndex].desc);
                         
+                        // FIX: Initialize partialDist using the path coordinates from start to S1
                         let currentPathIdx = findClosestPathIndex(latitude, longitude);
                         let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                         
                         let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
-                        speak("Navigation active. Next waypoint, " + nextCleanName);
+                        speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
                     }
                 }
             }
@@ -936,30 +935,26 @@
             }
         }
 
-       if (isAutoPaused || !lastCoords) return;
-        
+        if (isAutoPaused || !lastCoords) return;
         const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
-        
-        // FORCE UPDATE: Ignore GPS accuracy and speed filters
-        if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
-            totalDist += d; 
-            partialDist += d;
-        }
-
-        // UI refresh happens regardless of accuracy or speed
-        document.getElementById('total').innerText = totalDist.toFixed(2);
-        document.getElementById('partial').innerText = partialDist.toFixed(2);
-
-        if (navStarted || currentMode === 'REC') {
-            const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
-            if (elapsed > 0) {
-                document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
+        if (d > 0.002) {
+            if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
+                totalDist += d; partialDist += d;
             }
+            if (currentMode === 'REC') {
+                document.getElementById('total').innerText = totalDist.toFixed(2);
+                document.getElementById('partial').innerText = partialDist.toFixed(2);
+            }
+            if (navStarted || currentMode === 'REC') {
+                const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+                if (elapsed > 0) {
+                    document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
+                }
+            }
+            trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
+            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+            saveStateToVault();
         }
-
-        trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
-        lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-        saveStateToVault();
     }
 
     function startTimer() {
