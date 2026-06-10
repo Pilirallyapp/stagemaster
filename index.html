@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.57</title>
+    <title>StageMaster 5.58</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.57</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.58</div>
 </div>
 
 <div id="reportModal">
@@ -611,14 +611,14 @@
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
-        // GPS TRUST OVERRIDE: Remove all accuracy/speed gates
-        // This keeps the function running and the UI responsive
-        const currSpeedEl = document.getElementById('currSpeed');
-        const accEl = document.getElementById('accuracy');
-        if (currSpeedEl && accEl) {
-            accEl.innerText = `Acc: ${accuracy.toFixed(1)}m`;
-            accEl.style.background = accuracy < 25 ? "#34a853" : "#ea4335";
-            currSpeedEl.innerText = Math.round(curSpeed);
+        if (false) { // Force-deactivated the accuracy gate
+            let timeDeltaSec = (Date.now() - lastCoords.time) / 1000;
+            let spatialDeltaKM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
+            let mathematicalSpeed = timeDeltaSec > 0 ? (spatialDeltaKM / (timeDeltaSec / 3600)) : 0;
+            
+            if (mathematicalSpeed > 160 || (curSpeed === 0 && mathematicalSpeed > 6 && timeDeltaSec < 3)) {
+                return; 
+            }
         }
 
         const currSpeedEl = document.getElementById('currSpeed');
