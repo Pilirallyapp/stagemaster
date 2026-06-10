@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.54</title>
+    <title>StageMaster 5.55</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.54</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.55</div>
 </div>
 
 <div id="reportModal">
@@ -611,9 +611,11 @@
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
-        if (lastCoords && accuracy < 20) {
-        // Filter disabled: proceed to updates regardless of speed
-    }
+      // GPS TRUST OVERRIDE: Trust every pulse, no matter the accuracy or speed
+        if (!lastCoords) {
+            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+            return;
+        }
 
         const currSpeedEl = document.getElementById('currSpeed');
         const accEl = document.getElementById('accuracy');
@@ -934,26 +936,30 @@
             }
         }
 
-        if (isAutoPaused || !lastCoords) return;
+       if (isAutoPaused || !lastCoords) return;
+        
         const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
-        if (d > 0.002) {
-            if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
-                totalDist += d; partialDist += d;
-            }
-            if (currentMode === 'REC') {
-                document.getElementById('total').innerText = totalDist.toFixed(2);
-                document.getElementById('partial').innerText = partialDist.toFixed(2);
-            }
-            if (navStarted || currentMode === 'REC') {
-                const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
-                if (elapsed > 0) {
-                    document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
-                }
-            }
-            trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
-            lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
-            saveStateToVault();
+        
+        // FORCE UPDATE: Ignore GPS accuracy and speed filters
+        if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
+            totalDist += d; 
+            partialDist += d;
         }
+
+        // UI refresh happens regardless of accuracy or speed
+        document.getElementById('total').innerText = totalDist.toFixed(2);
+        document.getElementById('partial').innerText = partialDist.toFixed(2);
+
+        if (navStarted || currentMode === 'REC') {
+            const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+            if (elapsed > 0) {
+                document.getElementById('speed').innerText = (totalDist / (elapsed / 3600000)).toFixed(1);
+            }
+        }
+
+        trackPoints.push({ lat: latitude, lon: longitude, ele: altitude || 0 });
+        lastCoords = { lat: latitude, lon: longitude, ele: altitude || 0, time: Date.now() };
+        saveStateToVault();
     }
 
     function startTimer() {
