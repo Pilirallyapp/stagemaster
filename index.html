@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.46</title>
+    <title>StageMaster 5.61</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.46</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.61</div>
 </div>
 
 <div id="reportModal">
@@ -610,6 +610,8 @@
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
+	debugLog("GPS_TICK: Speed=" + Math.round(curSpeed) + ", Accuracy=" + accuracy.toFixed(1) + ", Timestamp=" + Date.now());
+	debugLog("CURRENT_PARTIAL: " + partialDist.toFixed(2));
         
         if (lastCoords && accuracy < 20) {
             let timeDeltaSec = (Date.now() - lastCoords.time) / 1000;
