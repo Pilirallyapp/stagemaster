@@ -616,7 +616,7 @@
             let spatialDeltaKM = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
             let mathematicalSpeed = timeDeltaSec > 0 ? (spatialDeltaKM / (timeDeltaSec / 3600)) : 0;
             
-            if (mathematicalSpeed > 160 || (curSpeed === 0 && mathematicalSpeed > 40 && timeDeltaSec < 3)) {
+            if (mathematicalSpeed > 160 || (curSpeed === 0 && mathematicalSpeed > 40 && timeDeltaSec < 1)) {
                 return; 
             }
         }
