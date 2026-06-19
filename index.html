@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.65</title>
+    <title>StageMaster 5.66</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.65</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.66</div>
 </div>
 
 <div id="reportModal">
@@ -928,11 +928,16 @@
             }
         }
 
-        if (isAutoPaused || !lastCoords) return;
+       if (isAutoPaused || !lastCoords) return;
         const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
         if (d > 0.002) {
             if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
-                totalDist += d; partialDist += d;
+                totalDist += d; 
+                // FIX: Only add the distance to the partial if we are RECORDING.
+                // In NAV mode, partial is a countdown handled at the top of the function.
+                if (currentMode === 'REC') {
+                    partialDist += d; 
+                }
             }
             if (currentMode === 'REC') {
                 document.getElementById('total').innerText = totalDist.toFixed(2);
