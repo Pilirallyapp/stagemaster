@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.67</title>
+    <title>StageMaster 5.68</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.67</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.68</div>
 </div>
 
 <div id="reportModal">
@@ -664,10 +664,17 @@
             const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
 
             if (!navStarted) {
-                document.getElementById('partial').innerText = distToStartGate.toFixed(2);
-                document.getElementById('total').innerText = "0.00";
-                
+                // Determine if we are physically on the track but far from the start line
+                let minPathDist = 999;
+                if (navPathCoords.length > 0) {
+                    for (let pt of navPathCoords) {
+                        let d = calculateHaverDist(latitude, longitude, pt.lat, pt.lon);
+                        if (d < minPathDist) minPathDist = d;
+                    }
+                }
+
                 if (distToStartGate <= 0.015) { 
+                    // NORMAL START GATE ENTRANCE
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
@@ -677,7 +684,6 @@
                     if (navWaypoints[activeWpIndex]) {
                         renderTulipPreview(navWaypoints[activeWpIndex].desc);
                         
-                        // FIX: Initialize partialDist using the path coordinates from start to S1
                         let currentPathIdx = findClosestPathIndex(latitude, longitude);
                         let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
@@ -685,6 +691,39 @@
                         let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
                         speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
                     }
+                } else if (minPathDist <= 0.035 && distToStartGate > 0.050) {
+                    // HOT JOIN: MID-STAGE ENTRANCE
+                    navStarted = true;
+                    sessionStartTime = Date.now();
+                    startTimer();
+                    speak("Stage joined mid path");
+                    
+                    // Find the next upcoming waypoint based on the path direction
+                    let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                    let foundNextWp = 1;
+                    for (let i = 1; i < navWaypoints.length; i++) {
+                        let wpPathIdx = findClosestPathIndex(navWaypoints[i].lat, navWaypoints[i].lon);
+                        if (wpPathIdx > currentPathIdx) {
+                            foundNextWp = i;
+                            break;
+                        }
+                    }
+                    activeWpIndex = foundNextWp;
+                    updateTargetDisplay();
+                    
+                    if (navWaypoints[activeWpIndex]) {
+                        renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                        
+                        let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                        partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
+                        
+                        let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
+                        speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
+                    }
+                } else {
+                    // WAITING TO START OR NOT ON TRACK
+                    document.getElementById('partial').innerText = distToStartGate.toFixed(2);
+                    document.getElementById('total').innerText = "0.00";
                 }
             }
 
