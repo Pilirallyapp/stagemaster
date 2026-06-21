@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.70</title>
+    <title>StageMaster 5.71</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.70</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.71</div>
 </div>
 
 <div id="reportModal">
@@ -732,6 +732,21 @@
                 let finishPathIdx = navPathCoords.length - 1;
                 let trackDistanceToFinish = calculateDistanceAlongPath(currentPathIdx, finishPathIdx);
                 document.getElementById('total').innerText = trackDistanceToFinish.toFixed(2);
+
+                // FIX: Dynamic Visual Progress Bar on the Top Button
+                if (window.lastFinishIdx !== finishPathIdx) {
+                    window.fullStageDist = calculateDistanceAlongPath(0, finishPathIdx);
+                    window.lastFinishIdx = finishPathIdx;
+                }
+                if (window.fullStageDist > 0) {
+                    let progressPct = ((1 - (trackDistanceToFinish / window.fullStageDist)) * 100);
+                    progressPct = Math.round(progressPct / 5) * 5; // Snap to 5% increments
+                    if (progressPct > 100) progressPct = 100;
+                    if (progressPct < 0) progressPct = 0;
+                    
+                    document.getElementById('importBtn').style.background = `linear-gradient(to right, #34a853 ${progressPct}%, rgba(52, 168, 83, 0.3) ${progressPct}%)`;
+                    document.getElementById('importBtn').style.border = "1px solid #34a853"; // Keeps the button edge crisp
+                }
 
                 let minPathDist = 999;
                 for (let pt of navPathCoords) {
