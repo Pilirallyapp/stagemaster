@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.68</title>
+    <title>StageMaster 5.70</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.68</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.70</div>
 </div>
 
 <div id="reportModal">
@@ -836,6 +836,35 @@
                         document.body.classList.remove('panic-mode');
                         document.getElementById('partialLabel').innerText = "Distance to WP";
                         announceBackOnTrackDouble(); 
+                        
+                        // FIX: Waypoint Catch-Up (Re-sync after returning to track)
+                        let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                        let foundNextWp = activeWpIndex;
+                        
+                        // Scan forward to see if we bypassed any waypoints while off track
+                        for (let i = activeWpIndex; i < navWaypoints.length; i++) {
+                            let wpPathIdx = findClosestPathIndex(navWaypoints[i].lat, navWaypoints[i].lon);
+                            if (wpPathIdx > currentPathIdx) {
+                                foundNextWp = i;
+                                break;
+                            }
+                        }
+                        
+                        // If we skipped waypoints, snap to the correct one and recalculate partial
+                        if (foundNextWp !== activeWpIndex) {
+                            activeWpIndex = foundNextWp;
+                            updateTargetDisplay();
+                            
+                            if (navWaypoints[activeWpIndex]) {
+                                renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                                
+                                let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                                partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
+                                
+                                let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
+                                speak("Re-synced. Next waypoint, " + nextCleanName);
+                            }
+                        }
                     }
                 }
 
@@ -924,7 +953,9 @@
                                 setTimeout(() => {
                                     let nextTarget = navWaypoints[activeWpIndex];
                                     let nextName = formatWpName(nextTarget.name);
-                                    let nextDist = calculateHaverDist(latitude, longitude, nextTarget.lat, nextTarget.lon);
+                                    
+                                    // FIX: Sync voice with the true road path distance instead of a direct line
+                                    let nextDist = partialDist; 
                                     speak("Distance to " + nextName + " is " + nextDist.toFixed(2) + " kilometers");
                                     
                                     let nextDistM = nextDist * 1000;
