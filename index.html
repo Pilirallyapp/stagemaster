@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.74</title>
+    <title>StageMaster 5.75</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.74</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.75</div>
 </div>
 
 <div id="reportModal">
@@ -464,8 +464,12 @@
                 }
 
                 // PRE-FLIGHT CACHING: Fetch images now before allowing navigation
-                const baseUrl = "https://github.com/pantelis/images/raw/main/";
-                const imageUrls = navWaypoints.map(wp => `${baseUrl}${wp.name}.jpg`);
+                let repoName = file.name.replace(".kml", "").trim();
+                const baseUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repoName}/main/`;
+                const imageUrls = navWaypoints.map(wp => {
+                    let wpRawName = wp.name.split('|')[0].trim();
+                    return `${baseUrl}${wpRawName}.png`;
+                });
                 
                 await Promise.all(imageUrls.map(url => {
                     return new Promise((resolve) => {
