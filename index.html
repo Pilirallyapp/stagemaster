@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.75</title>
+    <title>StageMaster 5.76</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -110,7 +110,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.75</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.76</div>
 </div>
 
 <div id="reportModal">
@@ -236,16 +236,23 @@
             return;
         }
 
-        let imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
+        let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
+        let imageUrl = null;
+
+        // PRIORITY 1: Pull strictly from the offline Blob Cache we created during import
+        if (window.offlineImageCache && window.offlineImageCache[wpRawName]) {
+            imageUrl = window.offlineImageCache[wpRawName];
+        }
         
+        // PRIORITY 2: Fallback to KML description extract
         if (!imageUrl) {
-            let wpRawName = navWaypoints[targetIndex].name.split('|')[0].trim();
-            
-            if (typeof loadedKmlName !== 'undefined' && loadedKmlName) {
-                let repo = loadedKmlName.split('/').pop().replace(".kml", "").trim();
-                imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
-                
-            }
+            imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
+        }
+
+        // PRIORITY 3: Final fallback to live web URL
+        if (!imageUrl && typeof loadedKmlName !== 'undefined' && loadedKmlName) {
+            let repo = loadedKmlName.split('/').pop().replace(".kml", "").trim();
+            imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
         }
 
         if (imageUrl) {
@@ -463,21 +470,25 @@
                     }
                 }
 
-                // PRE-FLIGHT CACHING: Fetch images now before allowing navigation
+                // PRE-FLIGHT CACHING: Fetch images as local Blobs for true offline capability
                 let repoName = file.name.replace(".kml", "").trim();
                 const baseUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repoName}/main/`;
-                const imageUrls = navWaypoints.map(wp => {
-                    let wpRawName = wp.name.split('|')[0].trim();
-                    return `${baseUrl}${wpRawName}.png`;
-                });
                 
-                await Promise.all(imageUrls.map(url => {
-                    return new Promise((resolve) => {
-                        const img = new Image();
-                        img.onload = resolve;
-                        img.onerror = resolve;
-                        img.src = url;
-                    });
+                window.offlineImageCache = {}; // Initialize internal cache dictionary
+                
+                await Promise.all(navWaypoints.map(async (wp) => {
+                    let wpRawName = wp.name.split('|')[0].trim();
+                    let url = `${baseUrl}${wpRawName}.png`;
+                    try {
+                        let response = await fetch(url);
+                        if (response.ok) {
+                            let blob = await response.blob();
+                            // Create a persistent local URL that works internet-free
+                            window.offlineImageCache[wpRawName] = URL.createObjectURL(blob);
+                        }
+                    } catch (err) {
+                        console.error("Failed to pre-load image for offline use: ", url);
+                    }
                 }));
 
                 // Reset state
