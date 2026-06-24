@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.76</title>
+    <title>StageMaster 5.77</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -59,6 +59,7 @@
     <div id="navControls" style="display: none; margin-bottom: 10px;">
         <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="startImport(event)">
         <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
+        <button id="wipeBtn" class="stop-btn" style="display: none; background-color: #8b0000; height: 45px; font-size: 1rem; margin-top: 10px; border: 1px solid #ff4444;">HOLD 3S TO WIPE ROUTE</button>
     </div>
 
     <div class="metric">
@@ -110,7 +111,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.76</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.77</div>
 </div>
 
 <div id="reportModal">
@@ -1409,6 +1410,62 @@
         clearVault();
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
+
+    // --- MEMORY WIPE LOGIC ---
+    const wipeBtn = document.getElementById('wipeBtn');
+    let wipeProgress = 0;
+    let wipeInterval;
+
+    function startWipeTimer(e) {
+        e.preventDefault();
+        wipeProgress = 0;
+        
+        // 60ms * 50 intervals = 3000ms (3 seconds)
+        wipeInterval = setInterval(() => {
+            wipeProgress += 2;
+            wipeBtn.style.background = `linear-gradient(to right, #ea4335 ${wipeProgress}%, #8b0000 ${wipeProgress}%)`;
+            
+            if (wipeProgress >= 100) {
+                clearInterval(wipeInterval);
+                executeFullWipe();
+            }
+        }, 60); 
+    }
+
+    function cancelWipeTimer(e) {
+        e.preventDefault();
+        clearInterval(wipeInterval);
+        wipeBtn.style.background = "#8b0000";
+        wipeProgress = 0;
+    }
+
+    function executeFullWipe() {
+        speak("Memory completely wiped. Ready for new stage.");
+        window.offlineImageCache = {}; // Flush the Blob images from active RAM
+        localStorage.removeItem('stagemaster_vault'); // Destroy the persistent save state
+        location.reload(); // Hard reset the UI and variables
+    }
+
+    wipeBtn.addEventListener('touchstart', startWipeTimer);
+    wipeBtn.addEventListener('touchend', cancelWipeTimer);
+    wipeBtn.addEventListener('touchcancel', cancelWipeTimer);
+    
+    // --- WIPE BUTTON VISIBILITY OVERRIDES ---
+    // Inject visibility into startImport success
+    const originalStartImport = startImport;
+    startImport = async function(event) {
+        await originalStartImport(event);
+        document.getElementById('wipeBtn').style.display = 'block';
+    };
+
+    // Inject visibility into state recovery
+    const originalCheckStateRecovery = checkStateRecovery;
+    checkStateRecovery = function() {
+        originalCheckStateRecovery();
+        if (navWaypoints && navWaypoints.length > 0) {
+            document.getElementById('wipeBtn').style.display = 'block';
+        }
+    };
 </script>
 </body>
 </html>
