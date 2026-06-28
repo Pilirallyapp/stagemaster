@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.78</title>
+    <title>StageMaster 5.79</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -37,6 +37,7 @@
         .wp-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; background: #1a1a1a; border-radius: 50%; z-index: 2; }
         .wp-btn img { width: 55px; height: 55px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
         .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 3; }
+        .wp-counter { position: absolute; top: 12px; right: 15px; font-size: 0.85rem; font-weight: bold; background: rgba(20,20,20,0.9); padding: 2px 7px; border-radius: 8px; z-index: 4; border: 1px solid #555; }
 
         /* Isolated Dynamic Tulip Box Structure */
         .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
@@ -92,16 +93,19 @@
     <div class="toolbar" id="recorderToolbar">
         <button class="wp-btn" id="btn-rp">
             <div class="progress-ring" id="ring-rp"></div>
+            <div class="wp-counter" id="count-rp" style="color: #fbbc05;">0</div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png">
             <div class="wp-label" style="color: #fbbc05;">R P</div>
         </button>
         <button class="wp-btn" id="btn-nos">
             <div class="progress-ring" id="ring-nos"></div>
+            <div class="wp-counter" id="count-nos" style="color: #1a73e8;">0</div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/blue_pin.png"> 
             <div class="wp-label" style="color: #1a73e8;">NO S</div>
         </button>
         <button class="wp-btn" id="btn-marshal">
             <div class="progress-ring" id="ring-marshal"></div>
+            <div class="wp-counter" id="count-marshal" style="color: #e67e22;">0</div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png">
             <div class="wp-label" style="color: #e67e22;">MARSHAL</div>
         </button>
@@ -111,7 +115,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.78</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.79</div>
 </div>
 
 <div id="reportModal">
@@ -1495,6 +1499,54 @@
         if (navWaypoints && navWaypoints.length > 0) {
             document.getElementById('wipeBtn').style.display = 'block';
         }
+    };
+
+// --- WAYPOINT COUNTERS LOGIC ---
+    function updateWpCounters() {
+        let rp = 0, nos = 0, marshal = 0;
+        waypoints.forEach(wp => {
+            if (wp.type === 'rp') rp++;
+            if (wp.type === 'nos') nos++;
+            if (wp.type === 's') marshal++; // 's' is the internal iconKey for Marshal
+        });
+        document.getElementById('count-rp').innerText = rp;
+        document.getElementById('count-nos').innerText = nos;
+        document.getElementById('count-marshal').innerText = marshal;
+    }
+
+    // Connect the counters to button clicks
+    const originalMark = mark;
+    mark = function(type) {
+        originalMark(type);
+        updateWpCounters();
+    };
+
+    // Connect the counters to app load/vault recovery
+    const originalCheckStateRecoveryCounters = checkStateRecovery;
+    checkStateRecovery = function() {
+        originalCheckStateRecoveryCounters();
+        
+        // Scan standard waypoints if in REC mode, or navWaypoints if in NAV mode
+        let activeWps = (typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) ? navWaypoints : waypoints;
+        
+        let rp = 0, nos = 0, marshal = 0;
+        activeWps.forEach(wp => {
+            // Note: Adjust these keys if your uploaded KML uses different identifiers for these types
+            if (wp.type === 'rp') rp++;
+            if (wp.type === 'nos') nos++;
+            if (wp.type === 's') marshal++; 
+        });
+        
+        document.getElementById('count-rp').innerText = rp;
+        document.getElementById('count-nos').innerText = nos;
+        document.getElementById('count-marshal').innerText = marshal;
+    };
+
+    // Zero out the counters when the vault is cleared (Export or Long-Press Reset)
+    const originalClearVault = clearVault;
+    clearVault = function() {
+        originalClearVault();
+        updateWpCounters();
     };
 </script>
 </body>
