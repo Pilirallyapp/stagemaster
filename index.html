@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.79</title>
+    <title>StageMaster 5.80</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -115,7 +115,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.79</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.80</div>
 </div>
 
 <div id="reportModal">
@@ -1504,11 +1504,20 @@
 // --- WAYPOINT COUNTERS LOGIC ---
     function updateWpCounters() {
         let rp = 0, nos = 0, marshal = 0;
-        waypoints.forEach(wp => {
-            if (wp.type === 'rp') rp++;
-            if (wp.type === 'nos') nos++;
-            if (wp.type === 's') marshal++; // 's' is the internal iconKey for Marshal
+        
+        // Scan standard waypoints if in REC mode, or navWaypoints if in NAV mode
+        let activeWps = (typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) ? navWaypoints : waypoints;
+        
+        activeWps.forEach(wp => {
+            // Get the type safely and convert to uppercase for comparison
+            // This ensures "rp", "RP", or "Rp" all match "RP"
+            let type = (wp.type || "").toUpperCase();
+            
+            if (type === 'RP') rp++;
+            if (type === 'NOS') nos++;
+            if (type === 'MARSHAL' || type === 'S') marshal++; 
         });
+        
         document.getElementById('count-rp').innerText = rp;
         document.getElementById('count-nos').innerText = nos;
         document.getElementById('count-marshal').innerText = marshal;
