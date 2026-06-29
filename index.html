@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.80</title>
+    <title>StageMaster 5.81</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -115,7 +115,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.80</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.81</div>
 </div>
 
 <div id="reportModal">
@@ -458,7 +458,17 @@
                     const point = placemarks[i].getElementsByTagName("Point")[0];
                     if (point) {
                         const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
-                        navWaypoints.push({ name: name, desc: description, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
+                        
+                        // Smart KML Classification: Search the name and description for your capitalized tags
+                        let wpType = "";
+                        let searchStr = (name + " " + description).toUpperCase();
+                        
+                        if (searchStr.includes("RP")) wpType = "RP";
+                        else if (searchStr.includes("NO S") || searchStr.includes("NOS")) wpType = "NOS";
+                        else if (searchStr.includes("MARSHAL")) wpType = "MARSHAL";
+
+                        // Push the waypoint WITH the new wpType attached
+                        navWaypoints.push({ name: name, desc: description, type: wpType, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
                     }
 
                     const line = placemarks[i].getElementsByTagName("LineString")[0];
