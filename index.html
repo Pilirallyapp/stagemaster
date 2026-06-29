@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.84.1</title>
+    <title>StageMaster 6.0</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -42,9 +42,11 @@
         /* Isolated Dynamic Tulip Box Structure */
         .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* Compass Arrow Shock Absorber */
+        .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; }
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
-        .modal-content { background: #2d2d2d; width: 85%; padding: 25px; border-radius: 25px; border: 2px solid #bf953f; text-align: center; }
     </style>
 </head>
 <body onload="checkStateRecovery()">
@@ -83,9 +85,10 @@
     <button id="recToggleBtn" class="start-btn">START RECORDING</button>
     <button id="navToggleBtn" class="start-btn" style="display: none;">START NAVIGATION</button>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
-        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.4rem; font-weight: bold; font-family: monospace;">0.0</div></div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
+        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Avg KM/H</div><div id="speed" style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">0.0</div></div>
+        <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Heading</div><div id="compass" style="font-size: 1.2rem; font-weight: bold; font-family: monospace; color: #bf953f;">---°</div></div>
     </div>
 
     <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
@@ -115,7 +118,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.84.1</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.0</div>
 </div>
 
 <div id="reportModal">
@@ -143,6 +146,39 @@
 </div>
 
 <script>
+    let globalCompassHeading = 0; // Memory for the HUD arrow
+
+    // --- COMPASS LOGIC ---
+    window.addEventListener("deviceorientationabsolute", (event) => {
+        let heading = null;
+        if (event.absolute && event.alpha !== null) {
+            heading = 360 - event.alpha; 
+        } else if (event.webkitCompassHeading) {
+            heading = event.webkitCompassHeading;
+        }
+
+        if (heading !== null) {
+            let finalHeading = Math.round(heading % 360);
+            if (finalHeading < 0) finalHeading += 360;
+            
+            globalCompassHeading = finalHeading; // Save it to global memory!
+            
+            let direction = "N";
+            if (finalHeading >= 22.5 && finalHeading < 67.5) direction = "NE";
+            else if (finalHeading >= 67.5 && finalHeading < 112.5) direction = "E";
+            else if (finalHeading >= 112.5 && finalHeading < 157.5) direction = "SE";
+            else if (finalHeading >= 157.5 && finalHeading < 202.5) direction = "S";
+            else if (finalHeading >= 202.5 && finalHeading < 247.5) direction = "SW";
+            else if (finalHeading >= 247.5 && finalHeading < 292.5) direction = "W";
+            else if (finalHeading >= 292.5 && finalHeading < 337.5) direction = "NW";
+
+            const compassEl = document.getElementById('compass');
+            if (compassEl) {
+                compassEl.innerText = finalHeading + "° " + direction;
+            }
+        }
+    }, true);
+
     let totalDist = 0, partialDist = 0, accumulatedTime = 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
@@ -422,6 +458,14 @@
         } else {
             document.getElementById('partialLabel').innerText = (mode === 'NAV') ? 'Distance to WP' : 'Partial KM';
         }
+
+        if (mode === 'REC' && typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) {
+            document.getElementById('total').innerText = "0.00";
+            document.getElementById('partial').innerText = "0.00";
+        } else if (mode === 'REC') {
+            document.getElementById('total').innerText = totalDist.toFixed(2);
+            document.getElementById('partial').innerText = partialDist.toFixed(2);
+        }
         
         if (mode === 'NAV' && navWaypoints.length > 0) {
             document.getElementById('importBtn').style.backgroundColor = "#34a853";
@@ -657,9 +701,64 @@
         setTimeout(() => { speak(recoveryPhrase); }, 2000); 
     }
 
+    // --- DYNAMIC ARROW MATH & LOGIC ---
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+        const toRad = Math.PI / 180;
+        const toDeg = 180 / Math.PI;
+        const dLon = (lon2 - lon1) * toRad;
+        const y = Math.sin(dLon) * Math.cos(lat2 * toRad);
+        const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
+        return ((Math.atan2(y, x) * toDeg) + 360) % 360;
+    }
+
+    function triggerDynamicArrowHUD(lat, lon) {
+        const liveBox = document.getElementById('tulipLiveBox');
+        const liveImg = document.getElementById('tulipLiveImg');
+        if (currentMode !== 'NAV') return;
+
+        let arrowMode = false;
+        let targetBearing = 0;
+        let lockDownwards = false;
+
+        if (isWrongWay) {
+            arrowMode = true; lockDownwards = true;
+        } else if (isOffTrack && navPathCoords && navPathCoords.length > 0) {
+            arrowMode = true;
+            let closestIdx = findClosestPathIndex(lat, lon);
+            targetBearing = calculateBearing(lat, lon, navPathCoords[closestIdx].lat, navPathCoords[closestIdx].lon);
+        } else if (!navStarted && !window.isPostFlying && typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) {
+            arrowMode = true;
+            targetBearing = calculateBearing(lat, lon, navWaypoints[0].lat, navWaypoints[0].lon);
+        }
+
+        if (arrowMode) {
+            liveImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bf953f'><path d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z'/></svg>";
+            liveImg.classList.add('compass-arrow');
+            liveBox.style.display = 'flex';
+
+            if (lockDownwards) {
+                liveImg.style.transform = `rotate(180deg)`;
+            } else {
+                let relativeRotation = targetBearing - globalCompassHeading;
+                liveImg.style.transform = `rotate(${relativeRotation}deg)`;
+            }
+        } else if (liveImg.classList.contains('compass-arrow')) {
+            liveImg.classList.remove('compass-arrow');
+            liveImg.style.transform = 'rotate(0deg)';
+            if (navStarted && navWaypoints[activeWpIndex]) {
+                let idx = (clearedWpIndex !== null && navWaypoints[clearedWpIndex]) ? clearedWpIndex : activeWpIndex;
+                renderTulipPreview(navWaypoints[idx].desc);
+            }
+        }
+    }
+    // ----------------------------------
+
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
+        
+        // FIRE THE DYNAMIC ARROW
+        if (typeof triggerDynamicArrowHUD === 'function') triggerDynamicArrowHUD(latitude, longitude);
         
         let dist = lastCoords ? calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude) : 0;
 
@@ -1117,11 +1216,14 @@
        if (isAutoPaused || !lastCoords) return;
         const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
         if (d > 0.002) {
-            if (currentMode === 'REC' || (currentMode === 'NAV' && navStarted)) {
-                totalDist += d; 
-                if (currentMode === 'REC') {
-                    partialDist += d; 
+            // FIX: If a route is loaded, do not let REC mode increment distances and corrupt NAV variables
+            if (currentMode === 'REC') {
+                if (navWaypoints.length === 0) {
+                    totalDist += d;
+                    partialDist += d;
                 }
+            } else if (currentMode === 'NAV' && navStarted) {
+                totalDist += d; 
             }
             
             // FIX: Keep counting partial distance upwards to the STOP point
@@ -1132,8 +1234,13 @@
             }
             
             if (currentMode === 'REC') {
-                document.getElementById('total').innerText = totalDist.toFixed(2);
-                document.getElementById('partial').innerText = partialDist.toFixed(2);
+                if (navWaypoints.length > 0) {
+                    document.getElementById('total').innerText = "0.00";
+                    document.getElementById('partial').innerText = "0.00";
+                } else {
+                    document.getElementById('total').innerText = totalDist.toFixed(2);
+                    document.getElementById('partial').innerText = partialDist.toFixed(2);
+                }
             }
             if (navStarted || currentMode === 'REC') {
                 const elapsed = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
