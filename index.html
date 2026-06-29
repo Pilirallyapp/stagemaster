@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.83</title>
+    <title>StageMaster 5.84</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -115,7 +115,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.83</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.84</div>
 </div>
 
 <div id="reportModal">
@@ -1519,18 +1519,23 @@
 // --- WAYPOINT COUNTERS LOGIC ---
     function updateWpCounters() {
         let rp = 0, nos = 0, marshal = 0;
-        
-        // Scan standard waypoints if in REC mode, or navWaypoints if in NAV mode
-        let activeWps = (typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) ? navWaypoints : waypoints;
+        let activeWps = [];
+
+        // LIVE COUNTDOWN LOGIC:
+        if (currentMode === 'NAV' && typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) {
+            // If driving, slice the list to ONLY look at waypoints we haven't reached yet
+            activeWps = navWaypoints.slice(activeWpIndex); 
+        } else {
+            // If recording, count normally
+            activeWps = waypoints;
+        }
         
         activeWps.forEach(wp => {
-            // Get the type safely and convert to uppercase for comparison
-            // This ensures "rp", "RP", or "Rp" all match "RP"
-            let type = (wp.type || "").toUpperCase();
+            let type = (wp.type || "").toUpperCase().trim();
             
             if (type === 'RP') rp++;
-            if (type === 'NOS') nos++;
-            if (type === 'MARSHAL' || type === 'S') marshal++; 
+            else if (type === 'NOS' || type === 'NO S') nos++;
+            else if (type === 'MARSHAL' || type === 'S') marshal++; 
         });
         
         document.getElementById('count-rp').innerText = rp;
@@ -1564,6 +1569,16 @@
     clearVault = function() {
         originalClearVault();
         updateWpCounters();
+    };
+
+    // --- LIVE COUNTDOWN TRIGGER HOOK ---
+    // Every time the target changes, refresh the numbers to tick them down
+    const originalUpdateTargetDisplayCounters = updateTargetDisplay;
+    updateTargetDisplay = function() {
+        originalUpdateTargetDisplayCounters();
+        if (typeof updateWpCounters === 'function') {
+            updateWpCounters();
+        }
     };
 </script>
 </body>
