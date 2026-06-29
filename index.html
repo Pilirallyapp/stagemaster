@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 5.81</title>
+    <title>StageMaster 5.82</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -115,7 +115,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.81</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 5.82</div>
 </div>
 
 <div id="reportModal">
@@ -542,6 +542,11 @@
                 btn.style.backgroundColor = "#34a853";
                 btn.innerText = "READY: " + navWaypoints.length + " WP";
                 speak(navWaypoints.length + " waypoints READY.");
+                
+                // Force counters to update the exact millisecond the file finishes loading
+                if (typeof updateWpCounters === 'function') {
+                    updateWpCounters();
+                }
             };
             reader.readAsText(file);
         }
@@ -1544,21 +1549,14 @@
     const originalCheckStateRecoveryCounters = checkStateRecovery;
     checkStateRecovery = function() {
         originalCheckStateRecoveryCounters();
-        
-        // Scan standard waypoints if in REC mode, or navWaypoints if in NAV mode
-        let activeWps = (typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) ? navWaypoints : waypoints;
-        
-        let rp = 0, nos = 0, marshal = 0;
-        activeWps.forEach(wp => {
-            // Note: Adjust these keys if your uploaded KML uses different identifiers for these types
-            if (wp.type === 'rp') rp++;
-            if (wp.type === 'nos') nos++;
-            if (wp.type === 's') marshal++; 
-        });
-        
-        document.getElementById('count-rp').innerText = rp;
-        document.getElementById('count-nos').innerText = nos;
-        document.getElementById('count-marshal').innerText = marshal;
+        updateWpCounters();
+    };
+
+    // --- FORCE REFRESH ON MODE SWITCH ---
+    const originalSwitchMode = switchMode;
+    switchMode = function(mode) {
+        originalSwitchMode(mode);
+        updateWpCounters();
     };
 
     // Zero out the counters when the vault is cleared (Export or Long-Press Reset)
