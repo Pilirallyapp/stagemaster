@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.01</title>
+    <title>StageMaster 6.02</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -43,8 +43,15 @@
         .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; }
         
-        /* Compass Arrow Shock Absorber */
+        /* Compass Arrow Shock Absorber & Panic Flash */
         .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; }
+        
+        .panic-mode .compass-arrow { animation: panic-arrow-color 0.5s infinite; }
+        @keyframes panic-arrow-color {
+            0% { filter: none; }
+            50% { filter: invert(20%) sepia(90%) saturate(7000%) hue-rotate(350deg) brightness(100%) contrast(120%); } /* Forces the gold SVG to render as bright red */
+            100% { filter: none; }
+        }
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
     </style>
@@ -118,7 +125,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.01</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.02</div>
 </div>
 
 <div id="reportModal">
@@ -161,21 +168,7 @@
             let finalHeading = Math.round(heading % 360);
             if (finalHeading < 0) finalHeading += 360;
             
-            globalCompassHeading = finalHeading; // Save it to global memory!
-            
-            let direction = "N";
-            if (finalHeading >= 22.5 && finalHeading < 67.5) direction = "NE";
-            else if (finalHeading >= 67.5 && finalHeading < 112.5) direction = "E";
-            else if (finalHeading >= 112.5 && finalHeading < 157.5) direction = "SE";
-            else if (finalHeading >= 157.5 && finalHeading < 202.5) direction = "S";
-            else if (finalHeading >= 202.5 && finalHeading < 247.5) direction = "SW";
-            else if (finalHeading >= 247.5 && finalHeading < 292.5) direction = "W";
-            else if (finalHeading >= 292.5 && finalHeading < 337.5) direction = "NW";
-
-            const compassEl = document.getElementById('compass');
-            if (compassEl) {
-                compassEl.innerText = finalHeading + "° " + direction;
-            }
+            globalCompassHeading = finalHeading; // Save quietly to memory, no screen updates here!
         }
     }, true);
 
@@ -670,7 +663,7 @@
             wrongWayInterval = null;
         }
         isAustereLoopRunning = true;
-        const austerePhrase = "Listen! you are driving the wrong way in the special stage. It is Dangerous, turn around immediately!";
+        const austerePhrase = "Listen to me! You are driving the wrong way in the special stage. It is dangerous, turn the car immediately!";
         speak(austerePhrase);
         wrongWayInterval = setInterval(() => {
             speak(austerePhrase);
@@ -768,6 +761,29 @@
         if (gpsHeading === null && lastCoords) {
             gpsHeading = calculateBearing(lastCoords.lat, lastCoords.lon, latitude, longitude);
         }
+
+        // --- SMART COMPASS TEXT UPDATE ---
+        let activeHeading = globalCompassHeading;
+        if (curSpeed > 5 && gpsHeading !== null) {
+            activeHeading = Math.round(gpsHeading);
+        } else {
+            activeHeading = Math.round(globalCompassHeading);
+        }
+        
+        let direction = "N";
+        if (activeHeading >= 22.5 && activeHeading < 67.5) direction = "NE";
+        else if (activeHeading >= 67.5 && activeHeading < 112.5) direction = "E";
+        else if (activeHeading >= 112.5 && activeHeading < 157.5) direction = "SE";
+        else if (activeHeading >= 157.5 && activeHeading < 202.5) direction = "S";
+        else if (activeHeading >= 202.5 && activeHeading < 247.5) direction = "SW";
+        else if (activeHeading >= 247.5 && activeHeading < 292.5) direction = "W";
+        else if (activeHeading >= 292.5 && activeHeading < 337.5) direction = "NW";
+
+        const compassEl = document.getElementById('compass');
+        if (compassEl) {
+            compassEl.innerText = activeHeading + "° " + direction;
+        }
+        // ---------------------------------
         
         // FIRE THE DYNAMIC ARROW (Now passing speed and gpsHeading)
         if (typeof triggerDynamicArrowHUD === 'function') triggerDynamicArrowHUD(latitude, longitude, curSpeed, gpsHeading);
@@ -980,7 +996,7 @@
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
                                 if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
-                                    triggerAustereLoopRunning();
+                                    triggerAustereAudioLoop(); // Fixed the typo right here
                                 }
                             }
                         } else if (angleDiff < 90) {
