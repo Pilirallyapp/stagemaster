@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.02</title>
+    <title>StageMaster 6.03</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -125,7 +125,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.02</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.03</div>
 </div>
 
 <div id="reportModal">
@@ -887,7 +887,7 @@
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                         
                         let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
-                        speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
+                        speak("Next waypoint, " + nextCleanName + " in " + partialDist.toFixed(2) + " kilometers");
                     }
                 } else if (minPathDist <= 0.035 && distToStartGate > 0.050) {
                     // HOT JOIN: MID-STAGE ENTRANCE
@@ -916,7 +916,7 @@
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                         
                         let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
-                        speak("Next waypoint, " + nextCleanName + " in " + (partialDist * 1000).toFixed(0) + " meters");
+                        speak("Next waypoint, " + nextCleanName + " in " + partialDist.toFixed(2) + " kilometers");
                     }
                 } else {
                     // WAITING TO START OR NOT ON TRACK
@@ -969,13 +969,13 @@
                         if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     }
 
-                    if (curSpeed < 1.0) {
+                    if (curSpeed < 1.5) {
                         if (isWrongWay && !wasSpeedZeroTriggered) {
                             if (wrongWayInterval) {
                                 clearInterval(wrongWayInterval);
                                 wrongWayInterval = null;
                             }
-                            speak("WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY"); 
+                            // FIX: Absolute silence when stopped. No parting words.
                             wasSpeedZeroTriggered = true;
                             zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
                         }
@@ -996,23 +996,27 @@
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
                                 if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
-                                    triggerAustereAudioLoop(); // Fixed the typo right here
+                                    triggerAustereAudioLoop();
                                 }
                             }
                         } else if (angleDiff < 90) {
                             upstreamAnchor = null; 
                             
                             if (isWrongWay) {
+                                // FIX: Instant silence the millisecond you turn the wheel the right way
                                 if (wrongWayInterval) {
                                     clearInterval(wrongWayInterval);
                                     wrongWayInterval = null;
                                 }
-                                wasSpeedZeroTriggered = false;
-                                if (!zeroSpeedAnchor) {
+                                
+                                // FIX: Set a fresh anchor exactly where you complete the U-turn
+                                if (!wasSpeedZeroTriggered) {
                                     zeroSpeedAnchor = { lat: latitude, lon: longitude };
+                                    wasSpeedZeroTriggered = true; 
                                 }
+                                
                                 let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
-                                if (recoveryDisplacementM >= 20) { 
+                                if (recoveryDisplacementM >= 15) { 
                                     stopWrongWayAudioLoop();
                                     document.body.classList.remove('panic-mode');
                                     document.getElementById('partialLabel').innerText = "Distance to WP";
@@ -1021,7 +1025,7 @@
                             }
                         }
                     }
-                }
+                } // <--- Here is the 5th bracket that closes the giant minPathDist <= 0.035 block!
 
                 if (minPathDist > 0.08) { 
                     if (isWrongWay) stopWrongWayAudioLoop(); 
@@ -1054,8 +1058,8 @@
                         let currentPathIdx = findClosestPathIndex(latitude, longitude);
                         let foundNextWp = activeWpIndex;
                         
-                        // Scan forward to see if we bypassed any waypoints while off track
-                        for (let i = activeWpIndex; i < navWaypoints.length; i++) {
+                        // FIX: Omnidirectional Sweep (Re-sync even if returning backwards on the stage)
+                        for (let i = 0; i < navWaypoints.length; i++) {
                             let wpPathIdx = findClosestPathIndex(navWaypoints[i].lat, navWaypoints[i].lon);
                             if (wpPathIdx > currentPathIdx) {
                                 foundNextWp = i;
