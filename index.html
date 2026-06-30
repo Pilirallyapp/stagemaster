@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.0</title>
+    <title>StageMaster 6.01</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -118,7 +118,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.0</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.01</div>
 </div>
 
 <div id="reportModal">
@@ -711,7 +711,7 @@
         return ((Math.atan2(y, x) * toDeg) + 360) % 360;
     }
 
-    function triggerDynamicArrowHUD(lat, lon) {
+    function triggerDynamicArrowHUD(lat, lon, currentSpeed, gpsHeading) {
         const liveBox = document.getElementById('tulipLiveBox');
         const liveImg = document.getElementById('tulipLiveImg');
         if (currentMode !== 'NAV') return;
@@ -739,7 +739,13 @@
             if (lockDownwards) {
                 liveImg.style.transform = `rotate(180deg)`;
             } else {
-                let relativeRotation = targetBearing - globalCompassHeading;
+                // Determine which heading to use: GPS if moving > 5km/h, otherwise Magnetic Sensor
+                let activeHeading = globalCompassHeading;
+                if (currentSpeed > 5 && gpsHeading !== null) {
+                    activeHeading = gpsHeading;
+                }
+                
+                let relativeRotation = targetBearing - activeHeading;
                 liveImg.style.transform = `rotate(${relativeRotation}deg)`;
             }
         } else if (liveImg.classList.contains('compass-arrow')) {
@@ -754,11 +760,17 @@
     // ----------------------------------
 
     function updateStats(pos) {
-        const { latitude, longitude, accuracy, speed, altitude } = pos.coords;
+        const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
-        // FIRE THE DYNAMIC ARROW
-        if (typeof triggerDynamicArrowHUD === 'function') triggerDynamicArrowHUD(latitude, longitude);
+        // Extract GPS heading provided by the device, or calculate it manually if missing
+        let gpsHeading = (heading !== null && !isNaN(heading)) ? heading : null;
+        if (gpsHeading === null && lastCoords) {
+            gpsHeading = calculateBearing(lastCoords.lat, lastCoords.lon, latitude, longitude);
+        }
+        
+        // FIRE THE DYNAMIC ARROW (Now passing speed and gpsHeading)
+        if (typeof triggerDynamicArrowHUD === 'function') triggerDynamicArrowHUD(latitude, longitude, curSpeed, gpsHeading);
         
         let dist = lastCoords ? calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude) : 0;
 
