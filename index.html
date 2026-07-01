@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.04</title>
+    <title>StageMaster 6.03</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -125,7 +125,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.04</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.03</div>
 </div>
 
 <div id="reportModal">
@@ -1047,15 +1047,6 @@
                         lastOffTrackWarning = Date.now();
                     }
 
-                    if (isOffTrack) {
-                    let currentActualDistM = minPathDist * 1000;
-                    document.getElementById('partial').innerText = "-" + Math.round(currentActualDistM);
-
-                    if (Date.now() - lastOffTrackWarning > 10000 && !isWrongWay) {
-                        speak("You are off course, return back");
-                        lastOffTrackWarning = Date.now();
-                    }
-
                     if (minPathDist < 0.01) { 
                         isOffTrack = false;
                         offTrackAnchor = null;
@@ -1076,26 +1067,19 @@
                             }
                         }
                         
-                        // --- THE CRITICAL FIX ---
-                        // We removed the 'if' condition here. The distance must ALWAYS be recalculated 
-                        // upon returning to the track to overwrite the stale memory vault data!
-                        let oldWpIndex = activeWpIndex;
-                        activeWpIndex = foundNextWp;
-                        updateTargetDisplay();
-                        
-                        if (navWaypoints[activeWpIndex]) {
-                            renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                        // If we skipped waypoints, snap to the correct one and recalculate partial
+                        if (foundNextWp !== activeWpIndex) {
+                            activeWpIndex = foundNextWp;
+                            updateTargetDisplay();
                             
-                            let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
-                            partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
-                            
-                            let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
-                            
-                            if (oldWpIndex !== activeWpIndex) {
+                            if (navWaypoints[activeWpIndex]) {
+                                renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                                
+                                let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                                partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
+                                
+                                let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
                                 speak("Re-synced. Next waypoint, " + nextCleanName);
-                            } else {
-                                // If it's the same waypoint, silently fix the math so the screen is instantly accurate
-                                console.log("Distance internally corrected after track re-entry.");
                             }
                         }
                     }
