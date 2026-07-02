@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.03</title>
+    <title>StageMaster 6.06</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -125,7 +125,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.03</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.06</div>
 </div>
 
 <div id="reportModal">
@@ -970,14 +970,18 @@
                     }
 
                     if (curSpeed < 1.5) {
-                        if (isWrongWay && !wasSpeedZeroTriggered) {
+                        if (isWrongWay) {
                             if (wrongWayInterval) {
                                 clearInterval(wrongWayInterval);
                                 wrongWayInterval = null;
                             }
-                            // FIX: Absolute silence when stopped. No parting words.
-                            wasSpeedZeroTriggered = true;
-                            zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
+                            // HARD FLUSH: Instantly kill any queued speech when the car stops
+                            window.speechSynthesis.cancel();
+                            
+                            if (!wasSpeedZeroTriggered) {
+                                wasSpeedZeroTriggered = true;
+                                zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
+                            }
                         }
                     } else {
                         if (angleDiff > 135) {
@@ -986,16 +990,20 @@
                                     upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
                                 }
                                 let displacementM = calculateHaverDist(upstreamAnchor.lat, upstreamAnchor.lon, latitude, longitude) * 1000;
-                                if (displacementM >= 20) { 
+                                // FAST TRIGGER: Reduced from 20m to 8m so the first warning fires almost immediately
+                                if (displacementM >= 8) { 
                                     isWrongWay = true;
                                     wasSpeedZeroTriggered = false;
                                     document.body.classList.add('panic-mode');
                                     document.getElementById('partialLabel').innerText = "WRONG WAY!";
+                                    window.speechSynthesis.cancel(); // Flush before speaking
                                     triggerWrongWayAudioLoop();
                                 }
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
-                                if (secondaryDisplacementM >= 20 && !isAustereLoopRunning) {
+                                // FAST AUSTERE LOOP: Reduced from 20m to 10m to trigger "Listen!" immediately after resuming wrong way
+                                if (secondaryDisplacementM >= 10 && !isAustereLoopRunning) {
+                                    window.speechSynthesis.cancel(); // Flush before speaking
                                     triggerAustereAudioLoop();
                                 }
                             }
@@ -1003,20 +1011,22 @@
                             upstreamAnchor = null; 
                             
                             if (isWrongWay) {
-                                // FIX: Instant silence the millisecond you turn the wheel the right way
+                                // INSTANT SILENCE the millisecond you face the right direction
                                 if (wrongWayInterval) {
                                     clearInterval(wrongWayInterval);
                                     wrongWayInterval = null;
                                 }
+                                window.speechSynthesis.cancel(); 
                                 
-                                // FIX: Set a fresh anchor exactly where you complete the U-turn
+                                // Set a fresh anchor exactly where you complete the U-turn
                                 if (!wasSpeedZeroTriggered) {
                                     zeroSpeedAnchor = { lat: latitude, lon: longitude };
                                     wasSpeedZeroTriggered = true; 
                                 }
                                 
                                 let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
-                                if (recoveryDisplacementM >= 15) { 
+                                // FAST RECOVERY: Reduced from 15m to 8m for quick "Correct direction" confirmation
+                                if (recoveryDisplacementM >= 8) { 
                                     stopWrongWayAudioLoop();
                                     document.body.classList.remove('panic-mode');
                                     document.getElementById('partialLabel').innerText = "Distance to WP";
