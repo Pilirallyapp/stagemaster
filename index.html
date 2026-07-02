@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.06</title>
+    <title>StageMaster 6.07</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -54,10 +54,18 @@
         }
 
         #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
+        
+        /* Fireworks Effect */
+        @keyframes firework-burst {
+            0% { box-shadow: 0 0 0 -5px #ff0, 0 0 0 -5px #ea4335, 0 0 0 -5px #34a853, 0 0 0 -5px #1a73e8; }
+            50% { box-shadow: 0 -40px 10px 5px #ff0, 40px -20px 10px 5px #ea4335, -40px -20px 10px 5px #34a853, 0 40px 10px 5px #1a73e8; }
+            100% { box-shadow: 0 -60px 20px 0 transparent, 60px -30px 20px 0 transparent, -60px -30px 20px 0 transparent, 0 60px 20px 0 transparent; }
+        }
+        .fireworks-active { animation: firework-burst 1s ease-out infinite; border: 4px solid #fbbc05 !important; }
     </style>
 </head>
 <body onload="checkStateRecovery()">
-
+#reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; }
 <div class="header"><h1>STAGEMASTER <span>by</span> PILI</h1></div>
 
 <div class="card">
@@ -125,7 +133,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.06</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.07</div>
 </div>
 
 <div id="reportModal">
@@ -155,6 +163,24 @@
 <script>
     let globalCompassHeading = 0; // Memory for the HUD arrow
 
+    // --- INSTANT FINISH BEEP ---
+    function playFinishBeep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, ctx.currentTime); // High pitch laser sound
+            osc.frequency.setValueAtTime(1760, ctx.currentTime + 0.15); // Higher pitch shift
+            gain.gain.setValueAtTime(1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.5);
+        } catch(e) {}
+    }
+
     // --- COMPASS LOGIC ---
     window.addEventListener("deviceorientationabsolute", (event) => {
         let heading = null;
@@ -172,7 +198,7 @@
         }
     }, true);
 
-    let totalDist = 0, partialDist = 0, accumulatedTime = 0;
+    let totalDist = 0, partialDist = 0, accumulatedTime = 0, maxSpeedAchieved = 0;
     let watchId = null, lastCoords = null, timerInterval = null, sessionStartTime = null, wakeLock = null;
     let isWaitingForAccuracy = false, trackPoints = [], waypoints = [], globalWpCounter = 1;
     let isAutoPaused = false, stopTimeStart = null, resumeStrikeStartTime = null;
@@ -756,6 +782,11 @@
         const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
+        // Top Speed Telemetry Tracker
+        if (navStarted && curSpeed > maxSpeedAchieved) {
+            maxSpeedAchieved = curSpeed;
+        }
+        
         // Extract GPS heading provided by the device, or calculate it manually if missing
         let gpsHeading = (heading !== null && !isNaN(heading)) ? heading : null;
         if (gpsHeading === null && lastCoords) {
@@ -1158,10 +1189,22 @@
                         let triggerDist = isFlying ? 10 : 35;
 
                         if (distM <= triggerDist) {
-                            speak("Arrived at " + cleanName + tulipNote);
-                            
                             if (isFlying) {
-                                speak("Special Stage Finished");
+                                // 1. Instant Millisecond Laser Beep
+                                playFinishBeep();
+                                
+                                // 2. Ignite Fireworks Visuals on Tulip Box
+                                const tulipBox = document.getElementById('tulipLiveBox');
+                                tulipBox.classList.add('fireworks-active');
+                                setTimeout(() => { tulipBox.classList.remove('fireworks-active'); }, 10000); // Burns out after 10s
+
+                                // 3. Telemetry Collection
+                                let finalTime = document.getElementById('timer').innerText;
+                                let finalAvgSpeed = document.getElementById('speed').innerText;
+                                
+                                // 4. The Grand Announcement
+                                speak("Special Stage Finished! Top speed: " + Math.round(maxSpeedAchieved) + " kilometers per hour. Average speed: " + finalAvgSpeed + ". Time: " + finalTime + ". Outstanding drive!");
+
                                 activeWpIndex++; 
                                 updateTargetDisplay();
                                 
@@ -1169,11 +1212,14 @@
                                 sessionStartTime = null;
                                 navStarted = false;
                                 
+                                // Reset Telemetry for next stage
+                                maxSpeedAchieved = 0;
+                                
                                 // FIX: Enter Post-Flying mode to track distance to STOP
                                 window.isPostFlying = true;
                                 partialDist = 0; 
                                 document.getElementById('partialLabel').innerText = "TO STOP (KM)";
-                                document.getElementById('partial').innerText = "0.00"; // Instantly visualizes the zero
+                                document.getElementById('partial').innerText = "0.00"; 
                                 document.getElementById('total').innerText = "0.00";
                                 
                                 let navBtn = document.getElementById('navToggleBtn');
@@ -1181,6 +1227,9 @@
                                 navBtn.className = "start-btn";
                                 navBtn.style.background = "#555";
                                 return;
+                            } else {
+                                // Normal Waypoint Speech
+                                speak("Arrived at " + cleanName + tulipNote);
                             }
 
                             // Capture coordinates and index to pin image to panel for 30m before updating visual asset
