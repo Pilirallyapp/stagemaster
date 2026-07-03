@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.26</title>
+    <title>StageMaster 6.30</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -91,6 +91,28 @@
         
         // 2. Hide this overlay to reveal the normal application underneath
         document.getElementById('languageOverlay').style.display = 'none';
+
+        // 3. Immediately translate the main UI buttons if Greek is chosen
+        if (langCode === 'el') {
+            document.getElementById('modeRec').innerText = "ΚΑΤΑΓΡΑΦΗ";
+            document.getElementById('modeNav').innerText = "ΠΛΟΗΓΗΣΗ";
+            document.getElementById('importBtn').innerText = "ΕΙΣΑΓΩΓΗ ΔΙΑΔΡΟΜΗΣ KML";
+            
+            let wipeBtn = document.getElementById('wipeBtn');
+            if (wipeBtn) wipeBtn.innerText = "ΚΡΑΤΗΣΤΕ 3 ΔΕΥΤ. ΓΙΑ ΔΙΑΓΡΑΦΗ";
+            
+            let recBtn = document.getElementById('recToggleBtn');
+            if (recBtn && recBtn.innerText === "START RECORDING") recBtn.innerText = "ΕΝΑΡΞΗ ΚΑΤΑΓΡΑΦΗΣ";
+            
+            let navBtn = document.getElementById('navToggleBtn');
+            if (navBtn && navBtn.innerText === "START NAVIGATION") navBtn.innerText = "ΕΝΑΡΞΗ ΠΛΟΗΓΗΣΗΣ";
+            
+            let rpBtn = document.getElementById('resetPartialBtn');
+            if (rpBtn) rpBtn.innerText = "ΜΕΡΙΚΟΣ ΜΗΔΕΝΙΣΜΟΣ";
+            
+            let expBtn = document.getElementById('exportBtn');
+            if (expBtn) expBtn.innerText = "ΛΗΨΗ ΑΡΧΕΙΟΥ KML";
+        }
     }
 
     // Optional: If you want the app to remember the choice and skip this screen on future loads, 
@@ -167,7 +189,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.26</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.30</div>
 </div>
 
 <div id="reportModal">
@@ -273,7 +295,67 @@
         nos: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/blue_pin.png'
     };
 
-    function speak(t) { window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); }
+    const GR_VOICE_TRANSLATIONS = {
+        "Session recovered from memory vault.": "Η διαδρομή ανακτήθηκε από τη μνήμη",
+        "Recording mode": "Καταγραφή Διαδρομής",
+        "Navigation mode": "Λειτουργία πλοήγησης",
+        "WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY": "ΕΚΑΝΕΣ ΛΑΘΟΣ! ΟΔΗΓΕΙΣ ΑΝΑΠΟΔΑ ΣΤΗΝ ΕΙΔΙΚΗ! ΓΥΡΝΑ ΤΟ ΑΥΤΟΚΙΝΗΤΟ ΑΜΕΣΩΣ!",
+        "Listen to me! You are driving the wrong way in the special stage. It is dangerous, turn the car immediately!": "Άκου σε με! Οδηγείς ανάποδα στην ειδική. Είναι επικίνδυνο, κάνε αναστροφή αμέσως!",
+        "CORRECT DIRECTION. GO!": "ΣΩΣΤΗ ΠΟΡΕΙΑ. ΦΥΓΑΜΕ!",
+        "Back on track, GO": "Μπήκες πάλι εντός διαδρομής. ΠΑΜΕ!",
+        "Now you can go!": "Τώρα μπορείς να ξεκινήσεις!",
+        "The special stage has started": "Η ειδική διαδρομή μόλις ξεκίνησε",
+        "Stage joined mid path": "Είσοδος στην ειδική διαδρομή από ενδιάμεσο σημείο",
+        "You are off course, return back": "Είσαι εκτός διαδρομής, γύρνα πίσω",
+        "80 meters": "80 μέτρα",
+        "Paused": "Σε παύση",
+        "Resumed": "Συνέχεια",
+        "Waiting for GPS accuracy": "Αναμονή για ακρίβεια σήματος GPS",
+        "RECORDING PAUSED": "ΠΑΥΣΗ ΚΑΤΑΓΡΑΦΗΣ ΔΙΑΔΡΟΜΗΣ",
+        "Route not loaded. Wait for READY status.": "Η διαδρομή δεν έχει φορτωθεί. Περίμενε την ένδειξη READY.",
+        "PAUSING NAVIGATION": "ΠΑΥΣΗ ΠΛΟΗΓΗΣΗΣ",
+        "STOPPING AND PREVIEWING STAGE": "ΔΙΑΚΟΠΗ ΚΑΙ ΕΠΙΣΚΟΠΗΣΗ ΕΙΔΙΚΗΣ",
+        "Stage summary closed. Ready to resume recording.": "Η σύνοψη έκλεισε. Έτοιμο για συνέχιση καταγραφής.",
+        "Stage name saved": "Το όνομα της ειδικής αποθηκεύτηκε",
+        "Partial Reset": "Μερικός Μηδενισμός",
+        "TOTAL KILOMETERS AND TIMER RESET": "ΜΗΔΕΝΙΣΜΟΣ ΟΛΙΚΩΝ ΚΑΙ ΧΡΟΝΟΜΕΤΡΟΥ",
+        "Memory vault cleared from route.": "Η μνήμη της διαδρομής καθαρίστηκε."
+    };
+
+    function translateVoice(text) {
+        if (localStorage.getItem('stagemaster_language') !== 'el') return text;
+        if (GR_VOICE_TRANSLATIONS[text]) return GR_VOICE_TRANSLATIONS[text];
+
+        let t = text;
+        let m;
+        
+        if (m = t.match(/^(\d+) waypoints READY\.$/)) return `${m[1]} σημεία φορτώθηκαν`;
+        if (m = t.match(/^Next waypoint, (.+) in ([\d\.]+) kilometers$/)) return `Επόμενο σημείο, ${m[1]} σε ${m[2]} χιλιόμετρα`;
+        if (m = t.match(/^Re-synced\. Next waypoint, (.+)$/)) return `Επανασυγχρονισμός. Επόμενο σημείο, ${m[1]}`;
+        if (m = t.match(/^Approaching (.+) in 2 kilometers$/)) return `Πλησιάζεις τον ${m[1]} σε 2 χιλιόμετρα`;
+        if (m = t.match(/^Approaching (.+) in 1 kilometer$/)) return `Φτάνεις στον ${m[1]} σε 1 χιλιόμετρο`;
+        if (m = t.match(/^500 meters(.*)$/)) return `500 μέτρα${m[1]}`;
+        if (m = t.match(/^Approaching (.+) in 200 meters(.*)$/)) return `Πλησιάζεις τον ${m[1]} σε 200 μέτρα${m[2]}`;
+        if (t.startsWith("Arrived at ")) return `Άφιξη σε ${t.substring(11)}`;
+        if (m = t.match(/^Distance to (.+) is ([\d\.]+) kilometers$/)) return `Η απόσταση για ${m[1]} είναι ${m[2]} χιλιόμετρα`;
+        if (m = t.match(/^No Safety Marshal saved at ([\d\.]+) kilometers$/)) return `Το σημείο χωρίς φύλακα αποθηκεύτηκε στα ${m[1]} χιλιόμετρα`;
+        if (m = t.match(/^Radio Point (\d+) saved at ([\d\.]+) kilometers$/)) return `Ο Ενδιάμεσος Κριτής ${m[1]} αποθηκεύτηκε στα ${m[2]} χιλιόμετρα`;
+        if (m = t.match(/^S (\d+) saved at ([\d\.]+) kilometers$/)) return `Ο Φύλακας ${m[1]} αποθηκεύτηκε στα ${m[2]} χιλιόμετρα`;
+        
+        if (t.startsWith("Special Stage Finished!")) {
+            m = t.match(/^Special Stage Finished! Top speed: (\d+) kilometers per hour\. Average speed: ([\d\.]+)\. Time: ([\d:]+)\. Outstanding drive!$/);
+            if (m) return `Τερματισμός Ειδικής Διαδρομής! Μέγιστη ταχύτητα: ${m[1]} χιλιόμετρα την ώρα. Μέση ταχύτητα: ${m[2]}. Χρόνος: ${m[3]}. Καταπληκτική οδήγηση!`;
+            return `Τερματισμός Ειδικής Διαδρομής`;
+        }
+        return text;
+    }
+
+    function speak(t) { 
+        let translatedText = translateVoice(t);
+        let utterance = new SpeechSynthesisUtterance(translatedText);
+        utterance.lang = (localStorage.getItem('stagemaster_language') === 'el') ? 'el-GR' : 'en-US';
+        window.speechSynthesis.speak(utterance); 
+    }
     
     async function requestWakeLock() { 
         try { 
@@ -1794,7 +1876,7 @@
     switchMode = function(mode) {
         originalSwitchMode(mode);
         updateWpCounters();
-    };
+    };// Logic to handle the button click
 
     // Zero out the counters when the vault is cleared (Export or Long-Press Reset)
     const originalClearVault = clearVault;
