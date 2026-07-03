@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.31</title>
+    <title>StageMaster 6.32</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -189,7 +189,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.31</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.32</div>
 </div>
 
 <div id="reportModal">
@@ -297,12 +297,12 @@
 
     const GR_VOICE_TRANSLATIONS = {
         "Session recovered from memory vault.": "Η διαδρομή ανακτήθηκε από τη μνήμη",
-        "Recording mode": "Καταγραφή Διαδρομής",
+        "Recording mode": "Καταγραφή διαδρομής",
         "Navigation mode": "Λειτουργία πλοήγησης",
-        "WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY": "ΕΚΑΝΕΣ ΛΑΘΟΣ! ΟΔΗΓΕΙΣ ΑΝΑΠΟΔΑ ΣΤΗΝ ΕΙΔΙΚΗ! ΓΥΡΝΑ ΤΟ ΑΥΤΟΚΙΝΗΤΟ ΑΜΕΣΩΣ!",
-        "Listen to me! You are driving the wrong way in the special stage. It is dangerous, turn the car immediately!": "Άκου σε με! Οδηγείς ανάποδα στην ειδική. Είναι επικίνδυνο, κάνε αναστροφή αμέσως!",
-        "CORRECT DIRECTION. GO!": "ΣΩΣΤΗ ΠΟΡΕΙΑ. ΦΥΓΑΜΕ!",
-        "Back on track, GO": "Μπήκες πάλι εντός διαδρομής. ΠΑΜΕ!",
+        "WRONG WAY! YOU ARE DRIVING THE WRONG WAY IN THE SPECIAL STAGE! TURN THE CAR IMMEDIATELY": "Έκανες λάθος! Οδηγείς ανάποδα στην ειδική! Γύρνα το αυτοκίνητο αμέσως!",
+        "Listen to me! You are driving the wrong way in the special stage. It is dangerous, turn the car immediately!": "Άκουσέ με! Οδηγείς ανάποδα στην ειδική. Είναι επικίνδυνο, κάνε αναστροφή αμέσως!",
+        "CORRECT DIRECTION. GO!": "Σωστή πορεία. Φύγαμε!",
+        "Back on track, GO": "Μπήκες πάλι εντός διαδρομής. Πάμε!",
         "Now you can go!": "Τώρα μπορείς να ξεκινήσεις!",
         "The special stage has started": "Η ειδική διαδρομή μόλις ξεκίνησε",
         "Stage joined mid path": "Είσοδος στην ειδική διαδρομή από ενδιάμεσο σημείο",
@@ -311,14 +311,14 @@
         "Paused": "Σε παύση",
         "Resumed": "Συνέχεια",
         "Waiting for GPS accuracy": "Αναμονή για ακρίβεια σήματος GPS",
-        "RECORDING PAUSED": "ΠΑΥΣΗ ΚΑΤΑΓΡΑΦΗΣ ΔΙΑΔΡΟΜΗΣ",
-        "Route not loaded. Wait for READY status.": "Η διαδρομή δεν έχει φορτωθεί. Περίμενε την ένδειξη READY.",
-        "PAUSING NAVIGATION": "ΠΑΥΣΗ ΠΛΟΗΓΗΣΗΣ",
-        "STOPPING AND PREVIEWING STAGE": "ΔΙΑΚΟΠΗ ΚΑΙ ΕΠΙΣΚΟΠΗΣΗ ΕΙΔΙΚΗΣ",
+        "RECORDING PAUSED": "Παύση καταγραφής διαδρομής",
+        "Route not loaded. Wait for READY status.": "Η διαδρομή δεν έχει φορτωθεί. Περίμενε την ένδειξη ready.",
+        "PAUSING NAVIGATION": "Παύση πλοήγησης",
+        "STOPPING AND PREVIEWING STAGE": "Διακοπή και επισκόπηση ειδικής",
         "Stage summary closed. Ready to resume recording.": "Η σύνοψη έκλεισε. Έτοιμο για συνέχιση καταγραφής.",
         "Stage name saved": "Το όνομα της ειδικής αποθηκεύτηκε",
-        "Partial Reset": "Μερικός Μηδενισμός",
-        "TOTAL KILOMETERS AND TIMER RESET": "ΜΗΔΕΝΙΣΜΟΣ ΟΛΙΚΩΝ ΚΑΙ ΧΡΟΝΟΜΕΤΡΟΥ",
+        "Partial Reset": "Μερικός μηδενισμός",
+        "TOTAL KILOMETERS AND TIMER RESET": "Μηδενισμός ολικών και χρονομέτρου",
         "Memory vault cleared from route.": "Η μνήμη της διαδρομής καθαρίστηκε."
     };
 
@@ -353,7 +353,18 @@
     function speak(t) { 
         let translatedText = translateVoice(t);
         let utterance = new SpeechSynthesisUtterance(translatedText);
-        utterance.lang = (localStorage.getItem('stagemaster_language') === 'el') ? 'el-GR' : 'en-US';
+        
+        let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+        utterance.lang = isGreek ? 'el-GR' : 'en-US';
+        
+        let voices = window.speechSynthesis.getVoices();
+        let targetLang = isGreek ? 'el' : 'en';
+        let selectedVoice = voices.find(v => v.lang.startsWith(targetLang));
+        
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+        }
+        
         window.speechSynthesis.speak(utterance); 
     }
     
