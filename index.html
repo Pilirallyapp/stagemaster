@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.32</title>
+    <title>StageMaster 6.33</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -36,7 +36,7 @@
         .progress-ring { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: conic-gradient(transparent 0deg, #444 0deg); z-index: 1; }
         .wp-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; background: #1a1a1a; border-radius: 50%; z-index: 2; }
         .wp-btn img { width: 55px; height: 55px; object-fit: contain; z-index: 3; margin-bottom: 2px; }
-        .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 3; }
+        .wp-label { font-size: 0.7rem; font-weight: bold; z-index: 3; text-transform: uppercase; }
         .wp-counter { position: absolute; top: 12px; right: 15px; font-size: 0.85rem; font-weight: bold; background: rgba(20,20,20,0.9); padding: 2px 7px; border-radius: 8px; z-index: 4; border: 1px solid #555; }
 
         /* Isolated Dynamic Tulip Box Structure */
@@ -72,13 +72,13 @@
     <!-- Greek Selection -->
     <div style="margin-bottom: 40px; cursor: pointer;" onclick="selectLanguage('el')">
         <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/gr-flag.png" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
-        <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">ΕΠΙΛΟΓΗ ΓΛΩΣΣΑΣ</div>
+        <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">Επιλογή γλώσσας</div>
     </div>
     
     <!-- English Selection -->
     <div style="cursor: pointer;" onclick="selectLanguage('en')">
         <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/eng-flag.png" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
-        <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">LANGUAGE SELECTION</div>
+        <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">Language selection</div>
     </div>
 
 </div>
@@ -94,24 +94,24 @@
 
         // 3. Immediately translate the main UI buttons if Greek is chosen
         if (langCode === 'el') {
-            document.getElementById('modeRec').innerText = "ΚΑΤΑΓΡΑΦΗ";
-            document.getElementById('modeNav').innerText = "ΠΛΟΗΓΗΣΗ";
-            document.getElementById('importBtn').innerText = "ΕΙΣΑΓΩΓΗ ΔΙΑΔΡΟΜΗΣ KML";
+            document.getElementById('modeRec').textContent = "Καταγραφή";
+            document.getElementById('modeNav').textContent = "Πλοήγηση";
+            document.getElementById('importBtn').textContent = "Εισαγωγή διαδρομής KML";
             
             let wipeBtn = document.getElementById('wipeBtn');
-            if (wipeBtn) wipeBtn.innerText = "ΚΡΑΤΗΣΤΕ 3 ΔΕΥΤ. ΓΙΑ ΔΙΑΓΡΑΦΗ";
+            if (wipeBtn) wipeBtn.textContent = "Κρατήστε 3 δευτ. για διαγραφή";
             
             let recBtn = document.getElementById('recToggleBtn');
-            if (recBtn && recBtn.innerText === "START RECORDING") recBtn.innerText = "ΕΝΑΡΞΗ ΚΑΤΑΓΡΑΦΗΣ";
+            if (recBtn && recBtn.classList.contains('start-btn')) recBtn.textContent = "Έναρξη καταγραφής";
             
             let navBtn = document.getElementById('navToggleBtn');
-            if (navBtn && navBtn.innerText === "START NAVIGATION") navBtn.innerText = "ΕΝΑΡΞΗ ΠΛΟΗΓΗΣΗΣ";
+            if (navBtn && navBtn.classList.contains('start-btn')) navBtn.textContent = "Έναρξη πλοήγησης";
             
             let rpBtn = document.getElementById('resetPartialBtn');
-            if (rpBtn) rpBtn.innerText = "ΜΕΡΙΚΟΣ ΜΗΔΕΝΙΣΜΟΣ";
+            if (rpBtn) rpBtn.textContent = "Μερικός μηδενισμός";
             
             let expBtn = document.getElementById('exportBtn');
-            if (expBtn) expBtn.innerText = "ΛΗΨΗ ΑΡΧΕΙΟΥ KML";
+            if (expBtn) expBtn.textContent = "Λήψη αρχείου KML";
         }
     }
 
@@ -126,14 +126,14 @@
 
 <div class="card">
     <div class="mode-container">
-        <button id="modeRec" class="mode-btn active" onclick="switchMode('REC')">REC MODE</button>
-        <button id="modeNav" class="mode-btn" onclick="switchMode('NAV')">NAV MODE</button>
+        <button id="modeRec" class="mode-btn active" onclick="switchMode('REC')">Rec mode</button>
+        <button id="modeNav" class="mode-btn" onclick="switchMode('NAV')">Nav mode</button>
     </div>
 
     <div id="navControls" style="display: none; margin-bottom: 10px;">
         <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="startImport(event)">
-        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">IMPORT KML PATH</button>
-        <button id="wipeBtn" class="stop-btn" style="display: none; background-color: #8b0000; height: 45px; font-size: 1rem; margin-top: 10px; border: 1px solid #ff4444;">HOLD 3S TO WIPE ROUTE</button>
+        <button id="importBtn" class="start-btn" style="background-color: #1a73e8; height: 50px; font-size: 1rem;" onclick="document.getElementById('kmlInput').click()">Import KML path</button>
+        <button id="wipeBtn" class="stop-btn" style="display: none; background-color: #8b0000; height: 45px; font-size: 1rem; margin-top: 10px; border: 1px solid #ff4444;">Hold 3s to wipe route</button>
     </div>
 
     <div class="metric">
@@ -153,8 +153,8 @@
         <div id="wpTargetDisplay" style="font-size: 0.8rem; color: #fbbc05; font-weight: bold; margin-top: 5px; display: none;">TARGET: ---</div>
     </div>
 
-    <button id="recToggleBtn" class="start-btn">START RECORDING</button>
-    <button id="navToggleBtn" class="start-btn" style="display: none;">START NAVIGATION</button>
+    <button id="recToggleBtn" class="start-btn">Start recording</button>
+    <button id="navToggleBtn" class="start-btn" style="display: none;">Start navigation</button>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
         <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Time</div><div id="timer" style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">00:00:00</div></div>
@@ -162,26 +162,26 @@
         <div style="background: #3d3d3d; padding: 8px; border-radius: 12px;"><div class="label">Heading</div><div id="compass" style="font-size: 1.2rem; font-weight: bold; font-family: monospace; color: #bf953f;">---°</div></div>
     </div>
 
-    <button id="resetPartialBtn" class="reset-partial-btn">RESET PARTIAL</button>
+    <button id="resetPartialBtn" class="reset-partial-btn">Reset partial</button>
 
     <div class="toolbar" id="recorderToolbar">
         <button class="wp-btn" id="btn-rp">
             <div class="progress-ring" id="ring-rp"></div>
             <div class="wp-counter" id="count-rp" style="color: #fbbc05;">0</div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png">
-            <div class="wp-label" style="color: #fbbc05;">R P</div>
+            <div class="wp-label" style="color: #fbbc05;">Rp</div>
         </button>
         <button class="wp-btn" id="btn-nos">
             <div class="progress-ring" id="ring-nos"></div>
             <div class="wp-counter" id="count-nos" style="color: #1a73e8;">0</div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/blue_pin.png"> 
-            <div class="wp-label" style="color: #1a73e8;">NO S</div>
+            <div class="wp-label" style="color: #1a73e8;">No s</div>
         </button>
         <button class="wp-btn" id="btn-marshal">
             <div class="progress-ring" id="ring-marshal"></div>
             <div class="wp-counter" id="count-marshal" style="color: #e67e22;">0</div>
             <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png">
-            <div class="wp-label" style="color: #e67e22;">MARSHAL</div>
+            <div class="wp-label" style="color: #e67e22;">Marshal</div>
         </button>
     </div>
 
@@ -189,7 +189,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.32</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.33</div>
 </div>
 
 <div id="reportModal">
@@ -1484,13 +1484,15 @@
     rBtn = document.getElementById('recToggleBtn');
     rBtn.addEventListener('touchstart', (e) => {
         requestWakeLock();
-        if (rBtn.innerText === "START RECORDING" || rBtn.innerText === "RESUME REC") {
+        const isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+        
+        if (rBtn.classList.contains('start-btn')) {
             isWaitingForAccuracy = true; 
             accuracyAchieved = false;
             isManualPaused = false;
             
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
-            rBtn.innerText = "PAUSE REC"; rBtn.className = "stop-btn"; rBtn.style.background = "#ea4335";
+            rBtn.textContent = isGreek ? "Παύση καταγραφής" : "Pause rec"; rBtn.className = "stop-btn"; rBtn.style.background = "#ea4335";
             speak("Waiting for GPS accuracy");
             saveStateToVault();
         } else {
@@ -1511,7 +1513,7 @@
                 clearInterval(itv); 
                 if (!wasLongPressTriggered) {
                     rBtn.style.background = "#34a853";
-                    rBtn.innerText = "RESUME REC"; rBtn.className = "start-btn";
+                    rBtn.textContent = isGreek ? "Συνέχιση καταγραφής" : "Resume rec"; rBtn.className = "start-btn";
                     speak("RECORDING PAUSED");
                     isManualPaused = true;
                     
@@ -1534,7 +1536,9 @@
     nBtn = document.getElementById('navToggleBtn');
     nBtn.addEventListener('touchstart', (e) => {
         requestWakeLock();
-        if (nBtn.innerText === "START NAVIGATION" || nBtn.innerText === "RESUME NAV") {
+        const isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+        
+        if (nBtn.classList.contains('start-btn')) {
             isWaitingForAccuracy = true; 
             accuracyAchieved = false;
             isManualPaused = false;
@@ -1545,7 +1549,7 @@
                 return;
             }
             watchId = navigator.geolocation.watchPosition(updateStats, null, { enableHighAccuracy: true });
-            nBtn.innerText = "PAUSE NAV"; nBtn.className = "stop-btn"; nBtn.style.background = "#ea4335";
+            nBtn.textContent = isGreek ? "Παύση πλοήγησης" : "Pause nav"; nBtn.className = "stop-btn"; nBtn.style.background = "#ea4335";
             speak("Waiting for GPS accuracy");
             saveStateToVault();
         } else {
