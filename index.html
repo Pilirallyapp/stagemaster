@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.35</title>
+    <title>StageMaster 6.40</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -189,10 +189,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.35</div>
-</div>
-
-<div id="reportModal">
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.40</div>
     <div class="modal-content">
         <div style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">STAGE SUMMARY</div>
         <div id="modalData" style="text-align: left; font-family: monospace; color: white; margin-bottom: 5px; line-height: 1.6;"></div>
@@ -472,6 +469,7 @@
             isOffTrack, offTrackAnchor, isWrongWay,
             upstreamAnchor, zeroSpeedAnchor, wasSpeedZeroTriggered, isAustereLoopRunning,
             clearedWpIndex, clearedWpLat, clearedWpLon,
+            isReverseMode: window.isReverseMode || false,
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -512,6 +510,7 @@
             clearedWpIndex = state.clearedWpIndex !== undefined ? state.clearedWpIndex : null;
             clearedWpLat = state.clearedWpLat !== undefined ? state.clearedWpLat : null;
             clearedWpLon = state.clearedWpLon !== undefined ? state.clearedWpLon : null;
+            window.isReverseMode = state.isReverseMode || false;
 
             switchMode(state.currentMode || 'REC');
 
@@ -624,122 +623,183 @@
         speak(mode === 'REC' ? "Recording mode" : "Navigation mode");
     }
 
-    async function startImport(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+    let rawWaypoints = [];
+    let rawPathCoords = [];
 
-            loadedKmlName = file.name;
-            const btn = document.getElementById('importBtn');
-            btn.innerText = "PRE-LOADING...";
-            
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
-                navWaypoints = [];
-                navPathCoords = [];
-
-                const placemarks = xmlDoc.getElementsByTagName("Placemark");
-                for (let i = 0; i < placemarks.length; i++) {
-                    const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
-                    const descNode = placemarks[i].getElementsByTagName("description")[0];
-                    const description = descNode ? descNode.textContent.trim() : "";
-                    
-                    const point = placemarks[i].getElementsByTagName("Point")[0];
-                    if (point) {
-                        const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
-                        
-                        let wpType = "";
-                        let searchStr = (name + " " + description).toUpperCase();
-                        
-                        // Bulletproof Regex: \d* allows numbers to be attached (matches RP, RP1, RP20, S1, S14)
-                        if (/\bRP\d*\b/.test(searchStr)) wpType = "RP";
-                        else if (/\bNO\s?S\d*\b/.test(searchStr)) wpType = "NOS";
-                        else if (/\bMARSHAL\d*\b/.test(searchStr) || /\bS\d*\b/.test(searchStr)) wpType = "MARSHAL";
-
-                        // Push the waypoint WITH the new wpType attached
-                        navWaypoints.push({ name: name, desc: description, type: wpType, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
-                    }
-
-                    const line = placemarks[i].getElementsByTagName("LineString")[0];
-                    if (line) {
-                        const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
-                        pts.forEach(p => {
-                            if (p.trim()) {
-                                const c = p.split(",");
-                                navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
-                            }
-                        });
-                    }
-                }
-
-                if (navPathCoords.length === 0) {
-                    const globalLines = xmlDoc.getElementsByTagName("LineString");
-                    for (let j = 0; j < globalLines.length; j++) {
-                        const pts = globalLines[j].getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
-                        pts.forEach(p => {
-                            if (p.trim()) {
-                                const c = p.split(",");
-                                navPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
-                            }
-                        });
-                    }
-                }
-
-                // PRE-FLIGHT CACHING: Fetch images as local Blobs for true offline capability
-                let repoName = file.name.replace(".kml", "").trim();
-                const baseUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repoName}/main/`;
-                
-                window.offlineImageCache = {}; // Initialize internal cache dictionary
-                
-                await Promise.all(navWaypoints.map(async (wp) => {
-                    let wpRawName = wp.name.split('|')[0].trim();
-                    let url = `${baseUrl}${wpRawName}.png`;
-                    try {
-                        let response = await fetch(url);
-                        if (response.ok) {
-                            let blob = await response.blob();
-                            // Create a persistent local URL that works internet-free
-                            window.offlineImageCache[wpRawName] = URL.createObjectURL(blob);
-                        }
-                    } catch (err) {
-                        console.error("Failed to pre-load image for offline use: ", url);
-                    }
-                }));
-
-                // Reset state
-                activeWpIndex = 0;
-                navStarted = false;
-                accuracyAchieved = false;
-                isManualPaused = false;
-                isOffTrack = false;
-                offTrackAnchor = null;
-                stopWrongWayAudioLoop();
-                upstreamAnchor = null;
-                zeroSpeedAnchor = null;
-                wasSpeedZeroTriggered = false;
-                isAustereLoopRunning = false;
-                clearedWpIndex = null;
-                clearedWpLat = null;
-                clearedWpLon = null;
-                
-                document.getElementById('tulipLiveBox').style.display = 'none';
-                document.body.classList.remove('panic-mode');
-                updateTargetDisplay();
-                saveStateToVault();
-                
-                window.appIsReady = true;
-                btn.style.backgroundColor = "#34a853";
-                btn.innerText = "READY: " + navWaypoints.length + " WP";
-                speak(navWaypoints.length + " waypoints READY.");
-                
-                // Force counters to update the exact millisecond the file finishes loading
-                if (typeof updateWpCounters === 'function') {
-                    updateWpCounters();
-                }
-            };
-            reader.readAsText(file);
+    function findClosestRawPathIndex(lat, lon) {
+        let minD = 999, closestIdx = 0;
+        for (let i = 0; i < rawPathCoords.length; i++) {
+            let d = calculateHaverDist(lat, lon, rawPathCoords[i].lat, rawPathCoords[i].lon);
+            if (d < minD) { minD = d; closestIdx = i; }
         }
+        return closestIdx;
+    }
+
+    async function startImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        loadedKmlName = file.name;
+        const btn = document.getElementById('importBtn');
+        let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+        btn.innerText = isGreek ? "ΑΝΑΓΝΩΣΗ..." : "PRE-LOADING...";
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+            rawWaypoints = [];
+            rawPathCoords = [];
+
+            const placemarks = xmlDoc.getElementsByTagName("Placemark");
+            for (let i = 0; i < placemarks.length; i++) {
+                const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
+                const descNode = placemarks[i].getElementsByTagName("description")[0];
+                const description = descNode ? descNode.textContent.trim() : "";
+                
+                const point = placemarks[i].getElementsByTagName("Point")[0];
+                if (point) {
+                    const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
+                    let wpType = "";
+                    let searchStr = (name + " " + description).toUpperCase();
+                    if (/\bRP\d*\b/.test(searchStr)) wpType = "RP";
+                    else if (/\bNO\s?S\d*\b/.test(searchStr)) wpType = "NOS";
+                    else if (/\bMARSHAL\d*\b/.test(searchStr) || /\bS\d*\b/.test(searchStr)) wpType = "MARSHAL";
+                    rawWaypoints.push({ name: name, desc: description, type: wpType, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
+                }
+
+                const line = placemarks[i].getElementsByTagName("LineString")[0];
+                if (line) {
+                    const pts = line.getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                    pts.forEach(p => {
+                        if (p.trim()) {
+                            const c = p.split(",");
+                            rawPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                        }
+                    });
+                }
+            }
+
+            if (rawPathCoords.length === 0) {
+                const globalLines = xmlDoc.getElementsByTagName("LineString");
+                for (let j = 0; j < globalLines.length; j++) {
+                    const pts = globalLines[j].getElementsByTagName("coordinates")[0].textContent.trim().split(/\s+/);
+                    pts.forEach(p => {
+                        if (p.trim()) {
+                            const c = p.split(",");
+                            rawPathCoords.push({ lon: parseFloat(c[0]), lat: parseFloat(c[1]) });
+                        }
+                    });
+                }
+            }
+
+            // Populate the Dropdown Modal
+            const select = document.getElementById('setupEntryPoint');
+            select.innerHTML = '';
+            rawWaypoints.forEach((wp, index) => {
+                let wpCleanName = wp.name.split('|')[0].trim();
+                let option = document.createElement('option');
+                option.value = index;
+                option.text = wpCleanName;
+                select.appendChild(option);
+            });
+
+            // Translate Modal if Greek
+            if (isGreek) {
+                document.getElementById('setupModalTitle').innerText = "ΡΥΘΜΙΣΕΙΣ ΕΙΔΙΚΗΣ";
+                document.getElementById('setupDirectionLabel').innerText = "ΚΑΤΕΥΘΥΝΣΗ";
+                document.getElementById('setupEntryPointLabel').innerText = "ΣΗΜΕΙΟ ΕΙΣΟΔΟΥ";
+                document.getElementById('setupLoadBtn').innerText = "ΦΟΡΤΩΣΗ ΔΙΑΔΡΟΜΗΣ";
+                document.getElementById('setupCancelBtn').innerText = "ΑΚΥΡΩΣΗ";
+                let dirSelect = document.getElementById('setupDirection');
+                dirSelect.options[0].text = "ΚΑΝΟΝΙΚΗ (Εκκίνηση προς Τερματισμό)";
+                dirSelect.options[1].text = "ΑΝΑΠΟΔΑ (Απενεργοποίηση Συναγερμού)";
+            }
+
+            document.getElementById('entrySetupModal').style.display = 'flex';
+            document.getElementById('kmlInput').value = ""; 
+        };
+        reader.readAsText(file);
+    }
+
+    function cancelRouteSetup() {
+        document.getElementById('entrySetupModal').style.display = 'none';
+        let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+        const btn = document.getElementById('importBtn');
+        btn.innerText = isGreek ? "ΕΙΣΑΓΩΓΗ ΔΙΑΔΡΟΜΗΣ KML" : "IMPORT KML PATH";
+        btn.style.backgroundColor = "#1a73e8";
+    }
+
+    async function applyRouteSetup() {
+        document.getElementById('entrySetupModal').style.display = 'none';
+        
+        let dir = document.getElementById('setupDirection').value;
+        let wpIndex = parseInt(document.getElementById('setupEntryPoint').value);
+        
+        window.isReverseMode = (dir === 'reverse');
+        
+        if (window.isReverseMode) {
+            navWaypoints = rawWaypoints.slice(0, wpIndex + 1).reverse();
+            let pIdx = findClosestRawPathIndex(rawWaypoints[wpIndex].lat, rawWaypoints[wpIndex].lon);
+            navPathCoords = rawPathCoords.slice(0, pIdx + 1).reverse();
+        } else {
+            navWaypoints = rawWaypoints.slice(wpIndex);
+            let pIdx = findClosestRawPathIndex(rawWaypoints[wpIndex].lat, rawWaypoints[wpIndex].lon);
+            navPathCoords = rawPathCoords.slice(pIdx);
+        }
+
+        const btn = document.getElementById('importBtn');
+        let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+        btn.innerText = isGreek ? "ΛΗΨΗ ΔΕΔΟΜΕΝΩΝ..." : "CACHING DATA...";
+
+        let repoName = loadedKmlName.replace(".kml", "").trim();
+        const baseUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repoName}/main/`;
+        
+        window.offlineImageCache = {}; 
+        
+        await Promise.all(navWaypoints.map(async (wp) => {
+            let wpRawName = wp.name.split('|')[0].trim();
+            let url = `${baseUrl}${wpRawName}.png`;
+            try {
+                let response = await fetch(url);
+                if (response.ok) {
+                    let blob = await response.blob();
+                    window.offlineImageCache[wpRawName] = URL.createObjectURL(blob);
+                }
+            } catch (err) {}
+        }));
+
+        activeWpIndex = 0;
+        navStarted = false;
+        accuracyAchieved = false;
+        isManualPaused = false;
+        isOffTrack = false;
+        offTrackAnchor = null;
+        stopWrongWayAudioLoop();
+        upstreamAnchor = null;
+        zeroSpeedAnchor = null;
+        wasSpeedZeroTriggered = false;
+        isAustereLoopRunning = false;
+        clearedWpIndex = null;
+        clearedWpLat = null;
+        clearedWpLon = null;
+        
+        document.getElementById('tulipLiveBox').style.display = 'none';
+        document.body.classList.remove('panic-mode');
+        updateTargetDisplay();
+        saveStateToVault();
+        
+        window.appIsReady = true;
+        btn.style.backgroundColor = "#34a853";
+        btn.innerText = isGreek ? `ΕΤΟΙΜΟ: ${navWaypoints.length} ΣΗΜΕΙΑ` : `READY: ${navWaypoints.length} WP`;
+        
+        speak(navWaypoints.length + " waypoints READY.");
+        
+        if (typeof updateWpCounters === 'function') {
+            updateWpCounters();
+        }
+        document.getElementById('wipeBtn').style.display = 'block';
+    }
 
     function updateTargetDisplay() {
         if (currentMode !== 'NAV') return;
@@ -1143,7 +1203,7 @@
                         }
                     } else {
                         if (angleDiff > 135) {
-                            if (!isWrongWay) {
+                            if (!isWrongWay && !window.isReverseMode) {
                                 if (!upstreamAnchor) {
                                     upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
                                 }
@@ -1157,7 +1217,7 @@
                                     window.speechSynthesis.cancel(); // Flush before speaking
                                     triggerWrongWayAudioLoop();
                                 }
-                            } else if (wasSpeedZeroTriggered && zeroSpeedAnchor) {
+                            } else if (wasSpeedZeroTriggered && zeroSpeedAnchor && !window.isReverseMode) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
                                 // FAST AUSTERE LOOP: Reduced from 20m to 10m to trigger "Listen!" immediately after resuming wrong way
                                 if (secondaryDisplacementM >= 10 && !isAustereLoopRunning) {
