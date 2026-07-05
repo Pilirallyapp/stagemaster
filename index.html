@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.42</title>
+    <title>StageMaster 6.43</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -111,9 +111,19 @@
             if (rpBtn) rpBtn.textContent = "Μερικός μηδενισμός";
             
             let expBtn = document.getElementById('exportBtn');
-            if (expBtn) expBtn.textContent = "Λήψη αρχείου KML";
+                if (expBtn) expBtn.textContent = "Λήψη αρχείου KML";
+
+                // Wipe Modal Translation
+                let wTitle = document.getElementById('wipeModalTitle');
+                if (wTitle) wTitle.textContent = "ΔΙΑΓΡΑΦΗ ΔΙΑΔΡΟΜΗΣ;";
+                let wText = document.getElementById('wipeModalText');
+                if (wText) wText.textContent = "Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τη φορτωμένη διαδρομή και τη μνήμη;";
+                let wYes = document.getElementById('wipeModalYesBtn');
+                if (wYes) wYes.textContent = "ΝΑΙ, ΔΙΑΓΡΑΦΗ";
+                let wNo = document.getElementById('wipeModalNoBtn');
+                if (wNo) wNo.textContent = "ΑΚΥΡΩΣΗ";
+            }
         }
-    }
 
     // Optional: If you want the app to remember the choice and skip this screen on future loads, 
     // uncomment the three lines below:
@@ -189,7 +199,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.42</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.43</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -222,9 +232,21 @@
         </select>
 
         <button id="setupLoadBtn" class="start-btn" style="height: 50px; margin-bottom: 10px;" onclick="applyRouteSetup()">LOAD ROUTE</button>
-        <button id="setupCancelBtn" class="stop-btn" style="background: #555; height: 50px;" onclick="cancelRouteSetup()">CANCEL</button>
+            <button id="setupCancelBtn" class="stop-btn" style="background: #555; height: 50px;" onclick="cancelRouteSetup()">CANCEL</button>
+        </div>
     </div>
-</div>
+
+    <!-- WIPE CONFIRMATION MODAL -->
+    <div id="wipeConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center;">
+        <div class="modal-content" style="background: #2d2d2d; padding: 1.5rem; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 2px solid #555;">
+            <div id="wipeModalTitle" style="color: #ea4335; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">CLEAR ROUTE MEMORY?</div>
+            <div id="wipeModalText" style="color: white; font-size: 1rem; margin-bottom: 25px;">Are you sure you want to permanently delete the loaded route and all memory?</div>
+            <div style="display: flex; gap: 10px;">
+                <button id="wipeModalYesBtn" class="stop-btn" style="flex: 1; height: 50px; background: #8b0000; border: 1px solid #ff4444;" onclick="confirmWipeYes()">YES, WIPE</button>
+                <button id="wipeModalNoBtn" class="start-btn" style="flex: 1; height: 50px; background: #555;" onclick="confirmWipeNo()">CANCEL</button>
+            </div>
+        </div>
+    </div>
 
 <script>
     let globalCompassHeading = 0; // Memory for the HUD arrow
