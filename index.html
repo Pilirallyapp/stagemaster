@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.03</title>
+    <title>StageMaster 7.04</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -202,7 +202,7 @@
         <div id="liveMap" style="width: 100%; height: 100%; display: none; border-radius: 13px;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.03</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.04</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -1094,6 +1094,7 @@
         // --- FEED MAP TRACKING (WRAPPED TO PREVENT LOOP CRASHES) ---
         try {
             if (typeof liveMap !== 'undefined' && liveMap) {
+                liveMap.invalidateSize(); // This line forces the grey box to load the tiles!
                 liveMap.setView([latitude, longitude], 18); 
                 if (typeof mapCarMarker !== 'undefined' && mapCarMarker) {
                     mapCarMarker.setLatLng([latitude, longitude]);
