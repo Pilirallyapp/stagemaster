@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 6.46 - Live Radar</title>
-    <!-- Leaflet Engine for Live Radar Fallback -->
+    <title>StageMaster 7.00</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
         .header h1 { margin: 5px 0; font-size: 1.8rem; color: #bf953f; text-transform: uppercase; font-weight: 900; }
@@ -43,7 +41,7 @@
         .wp-counter { position: absolute; top: 12px; right: 15px; font-size: 0.85rem; font-weight: bold; background: rgba(20,20,20,0.9); padding: 2px 7px; border-radius: 8px; z-index: 4; border: 1px solid #555; }
 
         /* Isolated Dynamic Tulip Box Structure */
-        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; position: relative; }
+        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; }
         
         /* Compass Arrow Shock Absorber & Panic Flash */
@@ -52,7 +50,7 @@
         .panic-mode .compass-arrow { animation: panic-arrow-color 0.5s infinite; }
         @keyframes panic-arrow-color {
             0% { filter: none; }
-            50% { filter: invert(20%) sepia(90%) saturate(7000%) hue-rotate(350deg) brightness(100%) contrast(120%); } 
+            50% { filter: invert(20%) sepia(90%) saturate(7000%) hue-rotate(350deg) brightness(100%) contrast(120%); } /* Forces the gold SVG to render as bright red */
             100% { filter: none; }
         }
 
@@ -71,21 +69,31 @@
 
 <!-- LANGUAGE SELECTION OVERLAY -->
 <div id="languageOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+    
+    <!-- Greek Selection -->
     <div style="margin-bottom: 40px; cursor: pointer;" onclick="selectLanguage('el')">
         <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/gr-flag.png" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
         <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">Επιλογή γλώσσας</div>
     </div>
+    
+    <!-- English Selection -->
     <div style="cursor: pointer;" onclick="selectLanguage('en')">
         <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/eng-flag.png" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
         <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">Language selection</div>
     </div>
+
 </div>
 
 <script>
+    // Logic to handle the button click
     function selectLanguage(langCode) {
+        // 1. Save the choice into the browser's memory for when the Excel file is ready
         localStorage.setItem('stagemaster_language', langCode);
+        
+        // 2. Hide this overlay to reveal the normal application underneath
         document.getElementById('languageOverlay').style.display = 'none';
 
+        // 3. Immediately translate the main UI buttons if Greek is chosen
         if (langCode === 'el') {
             document.getElementById('modeRec').textContent = "Καταγραφή";
             document.getElementById('modeNav').textContent = "Πλοήγηση";
@@ -106,6 +114,7 @@
             let expBtn = document.getElementById('exportBtn');
                 if (expBtn) expBtn.textContent = "Λήψη αρχείου KML";
 
+                // Wipe Modal Translation
                 let wTitle = document.getElementById('wipeModalTitle');
                 if (wTitle) wTitle.textContent = "ΔΙΑΓΡΑΦΗ ΔΙΑΔΡΟΜΗΣ;";
                 let wText = document.getElementById('wipeModalText');
@@ -116,6 +125,12 @@
                 if (wNo) wNo.textContent = "ΑΚΥΡΩΣΗ";
             }
         }
+
+    // Optional: If you want the app to remember the choice and skip this screen on future loads, 
+    // uncomment the three lines below:
+    // if (localStorage.getItem('stagemaster_language')) {
+    //     document.getElementById('languageOverlay').style.display = 'none';
+    // }
 </script>
 
 <div class="header"><h1>STAGEMASTER <span>by</span> PILI</h1></div>
@@ -182,13 +197,14 @@
     </div>
 
     <div class="tulip-preview-container" id="tulipLiveBox">
-        <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
-        <div id="tulipLiveMap" style="width: 100%; height: 100%; display: none; background: #1a1a1a;"></div>
+        <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview" style="display: none; width: 100%; height: 100%; object-fit: contain;">
+        <div id="liveMap" style="width: 100%; height: 100%; display: none; border-radius: 13px;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 6.46</div>
-</div> 
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.00</div>
+</div> <!-- This closes the main .card container! -->
 
+<!-- FIX 1: Restored STAGE SUMMARY MODAL -->
 <div id="reportModal">
     <div class="modal-content" style="background: #2d2d2d; padding: 1.5rem; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 2px solid #555;">
         <div style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">STAGE SUMMARY</div>
@@ -202,6 +218,7 @@
     </div>
 </div>
 
+<!-- FIX 2: Restored ROUTE SETUP MODAL -->
 <div id="entrySetupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center;">
     <div class="modal-content" style="background: #2d2d2d; padding: 1.5rem; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 2px solid #555;">
         <div id="setupModalTitle" style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">ROUTE SETUP</div>
@@ -234,11 +251,9 @@
     </div>
 
 <script>
-    let globalCompassHeading = 0; 
-    let miniMap = null;
-    let miniRouteLine = null;
-    let miniCarMarker = null;
+    let globalCompassHeading = 0; // Memory for the HUD arrow
 
+    // --- INSTANT FINISH BEEP ---
     function playFinishBeep() {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -247,8 +262,8 @@
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.type = 'square';
-            osc.frequency.setValueAtTime(880, ctx.currentTime); 
-            osc.frequency.setValueAtTime(1760, ctx.currentTime + 0.15); 
+            osc.frequency.setValueAtTime(880, ctx.currentTime); // High pitch laser sound
+            osc.frequency.setValueAtTime(1760, ctx.currentTime + 0.15); // Higher pitch shift
             gain.gain.setValueAtTime(1, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
             osc.start(ctx.currentTime);
@@ -256,6 +271,7 @@
         } catch(e) {}
     }
 
+    // --- COMPASS LOGIC ---
     window.addEventListener("deviceorientationabsolute", (event) => {
         let heading = null;
         if (event.absolute && event.alpha !== null) {
@@ -268,7 +284,7 @@
             let finalHeading = Math.round(heading % 360);
             if (finalHeading < 0) finalHeading += 360;
             
-            globalCompassHeading = finalHeading; 
+            globalCompassHeading = finalHeading; // Save quietly to memory, no screen updates here!
         }
     }, true);
 
@@ -300,6 +316,7 @@
     let wasSpeedZeroTriggered = false;
     let isAustereLoopRunning = false;
 
+    // Track when the last waypoint was triggered to apply the 30-meter stay visual delay
     let clearedWpIndex = null;
     let clearedWpLat = null;
     let clearedWpLon = null;
@@ -406,17 +423,21 @@
         return clean;
     }
 
+    // High Precision Text-to-Image Link & Base64 Data Harvester
     function extractTulipImageUrl(descText) {
         if (!descText) return null;
         
+        // Priority 1: Match naked Base64 image data strings directly (Bypasses Google URL completely)
         const base64Match = descText.match(/(data:image\/[a-zA-Z]*;base64,[^\s<>""']+)/i);
         if (base64Match && base64Match[1]) return base64Match[1];
 
+        // Priority 2: Match standard HTML img tags embedded with src containing web URLs but exclude google hosted images
         const imgTagMatch = descText.match(/<img[^>]+src=["']([^"']+)["']/i);
         if (imgTagMatch && imgTagMatch[1] && !imgTagMatch[1].includes("usercontent.google.com")) {
             return imgTagMatch[1];
         }
         
+        // Priority 3: Match naked non-Google URL parameters that link to standard image extensions
         const urlMatch = descText.match(/(https?:\/\/[^\s<>""']+\.(?:png|jpg|jpeg|gif|webp))/i);
         if (urlMatch && urlMatch[1] && !urlMatch[1].includes("usercontent.google.com")) {
             return urlMatch[1];
@@ -425,65 +446,34 @@
         return null;
     }
 
-    function initOrUpdateMiniMap() {
-        if (!miniMap) {
-            miniMap = L.map('tulipLiveMap', {
-                zoomControl: false,
-                attributionControl: false,
-                dragging: false,
-                touchZoom: false,
-                scrollWheelZoom: false,
-                doubleClickZoom: false,
-                boxZoom: false
-            }).setView([0, 0], 16); 
+    // Clears or populates the graphic container safely with 30m stay rule handling logic
+   // --- MAP ENGINE SETUP ---
+    let liveMap = null;
+    let mapCarMarker = null;
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19
-            }).addTo(miniMap);
-        }
-
-        setTimeout(() => { miniMap.invalidateSize(); }, 100);
-
-        if (navPathCoords.length > 0) {
-            let latLngs = navPathCoords.map(p => [p.lat, p.lon]);
-            if (miniRouteLine) {
-                miniRouteLine.setLatLngs(latLngs);
-            } else {
-                miniRouteLine = L.polyline(latLngs, { color: '#ea4335', weight: 5, opacity: 0.8 }).addTo(miniMap);
-            }
-        }
-
-        if (lastCoords) {
-            miniMap.setView([lastCoords.lat, lastCoords.lon], 16);
-            
-            let carImageUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/main/4x4.png';
-            let bearing = globalCompassHeading; 
-            let carIcon = L.divIcon({
-                html: `<img src="${carImageUrl}" style="width:30px; height:30px; object-fit:contain; transform: rotate(${bearing}deg); transition: transform 0.1s linear;">`,
-                className: 'custom-car-div',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-
-            if (miniCarMarker) {
-                miniCarMarker.setLatLng([lastCoords.lat, lastCoords.lon]);
-                miniCarMarker.setIcon(carIcon);
-            } else {
-                miniCarMarker = L.marker([lastCoords.lat, lastCoords.lon], {icon: carIcon, zIndexOffset: 1000}).addTo(miniMap);
-            }
-        }
+    function initMap() {
+        if (liveMap) return;
+        liveMap = L.map('liveMap', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false }).setView([38.052, 23.828], 17);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '' }).addTo(liveMap);
+        
+        let carIcon = L.divIcon({
+            html: `<img id="mapCarImg" src="https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/main/4x4.png" style="width:30px;height:30px;transform: rotate(0deg); display: block; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
+            className: 'custom-car-div',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+        mapCarMarker = L.marker([38.052, 23.828], { icon: carIcon, zIndexOffset: 1000 }).addTo(liveMap);
     }
 
-    function renderTulipPreview(descText) {
+   function renderTulipPreview(descText) {
         const liveBox = document.getElementById('tulipLiveBox');
         const liveImg = document.getElementById('tulipLiveImg');
-        const liveMap = document.getElementById('tulipLiveMap');
+        const mapDiv = document.getElementById('liveMap');
         
         if (currentMode !== 'NAV' || !navStarted) {
             liveBox.style.display = 'none';
-            liveImg.style.display = 'none';
-            liveMap.style.display = 'none';
             liveImg.src = "";
+            if (mapDiv) mapDiv.style.display = 'none';
             return;
         }
 
@@ -495,6 +485,7 @@
         if (!navWaypoints[targetIndex]) {
             liveBox.style.display = 'none';
             liveImg.src = "";
+            if (mapDiv) mapDiv.style.display = 'none';
             return;
         }
 
@@ -515,18 +506,18 @@
         }
 
         if (imageUrl) {
-            liveMap.style.display = 'none';
-            liveImg.style.display = 'block';
             liveImg.src = imageUrl;
+            liveImg.style.display = 'block';
+            if (mapDiv) mapDiv.style.display = 'none';
             liveBox.style.display = 'flex';
         } else {
-            // NO IMAGE FOUND: Switch to Mini Live Radar
             liveImg.style.display = 'none';
             liveImg.src = "";
-            liveBox.style.display = 'block'; 
-            liveMap.style.display = 'block';
+            if (mapDiv) mapDiv.style.display = 'block';
+            liveBox.style.display = 'flex';
             
-            initOrUpdateMiniMap();
+            if (!liveMap) initMap();
+            setTimeout(() => { liveMap.invalidateSize(); }, 100);
         }
     }
 
@@ -764,6 +755,7 @@
                 }
             }
 
+            // Populate the Dropdown Modal
             const select = document.getElementById('setupEntryPoint');
             select.innerHTML = '';
             rawWaypoints.forEach((wp, index) => {
@@ -774,6 +766,7 @@
                 select.appendChild(option);
             });
 
+            // Translate Modal if Greek
             if (isGreek) {
                 document.getElementById('setupModalTitle').innerText = "ΡΥΘΜΙΣΕΙΣ ΕΙΔΙΚΗΣ";
                 document.getElementById('setupDirectionLabel').innerText = "ΚΑΤΕΥΘΥΝΣΗ";
@@ -855,6 +848,19 @@
         
         document.getElementById('tulipLiveBox').style.display = 'none';
         document.body.classList.remove('panic-mode');
+        
+        // --- DRAW ROUTE ON LEAFLET MAP ---
+        if (typeof liveMap === 'undefined' || !liveMap) {
+            if (typeof initMap === 'function') initMap();
+        }
+        if (liveMap && window.mapRouteLine) {
+            liveMap.removeLayer(window.mapRouteLine);
+        }
+        if (liveMap && navPathCoords.length > 0) {
+            let latlngs = navPathCoords.map(pt => [pt.lat, pt.lon]);
+            window.mapRouteLine = L.polyline(latlngs, { color: '#ea4335', weight: 6, opacity: 0.8 }).addTo(liveMap);
+        }
+        
         updateTargetDisplay();
         saveStateToVault();
         
@@ -878,6 +884,8 @@
                 document.getElementById('wpTargetDisplay').innerText = "TARGET: STOP CONTROL";
                 return;
             }
+            // The hardcoded "START GATE" override has been removed.
+            // The app will now fall through and dynamically display your chosen entry point.
         }
 
         if (navWaypoints[activeWpIndex]) {
@@ -974,6 +982,7 @@
         setTimeout(() => { speak(recoveryPhrase); }, 2000); 
     }
 
+    // --- DYNAMIC ARROW MATH & LOGIC ---
     function calculateBearing(lat1, lon1, lat2, lon2) {
         const toRad = Math.PI / 180;
         const toDeg = 180 / Math.PI;
@@ -986,7 +995,6 @@
     function triggerDynamicArrowHUD(lat, lon, currentSpeed, gpsHeading) {
         const liveBox = document.getElementById('tulipLiveBox');
         const liveImg = document.getElementById('tulipLiveImg');
-        const liveMap = document.getElementById('tulipLiveMap');
         if (currentMode !== 'NAV') return;
 
         let arrowMode = false;
@@ -1005,8 +1013,6 @@
         }
 
         if (arrowMode) {
-            if(liveMap) liveMap.style.display = 'none';
-            liveImg.style.display = 'block';
             liveImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bf953f'><path d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z'/></svg>";
             liveImg.classList.add('compass-arrow');
             liveBox.style.display = 'flex';
@@ -1014,6 +1020,7 @@
             if (lockDownwards) {
                 liveImg.style.transform = `rotate(180deg)`;
             } else {
+                // Determine which heading to use: GPS if moving > 5km/h, otherwise Magnetic Sensor
                 let activeHeading = globalCompassHeading;
                 if (currentSpeed > 5 && gpsHeading !== null) {
                     activeHeading = gpsHeading;
@@ -1031,20 +1038,24 @@
             }
         }
     }
+    // ----------------------------------
 
     function updateStats(pos) {
         const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
         let curSpeed = speed ? speed * 3.6 : 0;
         
+        // Top Speed Telemetry Tracker
         if (navStarted && curSpeed > maxSpeedAchieved) {
             maxSpeedAchieved = curSpeed;
         }
         
+        // Extract GPS heading provided by the device, or calculate it manually if missing
         let gpsHeading = (heading !== null && !isNaN(heading)) ? heading : null;
         if (gpsHeading === null && lastCoords) {
             gpsHeading = calculateBearing(lastCoords.lat, lastCoords.lon, latitude, longitude);
         }
 
+        // --- SMART COMPASS TEXT UPDATE ---
         let activeHeading = globalCompassHeading;
         if (curSpeed > 5 && gpsHeading !== null) {
             activeHeading = Math.round(gpsHeading);
@@ -1065,26 +1076,23 @@
         if (compassEl) {
             compassEl.innerText = activeHeading + "° " + direction;
         }
+        // ---------------------------------
         
+        // --- FEED MAP TRACKING & ROTATE CAR ---
+        if (typeof liveMap !== 'undefined' && liveMap && document.getElementById('liveMap').style.display === 'block') {
+            liveMap.setView([latitude, longitude]); 
+            if (typeof mapCarMarker !== 'undefined' && mapCarMarker) {
+                mapCarMarker.setLatLng([latitude, longitude]);
+                let mapCarImg = document.getElementById('mapCarImg');
+                if (mapCarImg) {
+                    mapCarImg.style.transform = `rotate(${activeHeading}deg)`;
+                }
+            }
+        }
+        
+        // FIRE THE DYNAMIC ARROW (Now passing speed and gpsHeading)
         if (typeof triggerDynamicArrowHUD === 'function') triggerDynamicArrowHUD(latitude, longitude, curSpeed, gpsHeading);
         
-        // --- LIVE RADAR UPDATE ---
-        const liveMap = document.getElementById('tulipLiveMap');
-        if (liveMap && liveMap.style.display === 'block' && miniMap && miniCarMarker) {
-            miniMap.panTo([latitude, longitude]);
-            miniCarMarker.setLatLng([latitude, longitude]);
-            
-            let carImageUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/main/4x4.png';
-            let carIcon = L.divIcon({
-                html: `<img src="${carImageUrl}" style="width:30px; height:30px; object-fit:contain; transform: rotate(${activeHeading}deg); transition: transform 0.1s linear;">`,
-                className: 'custom-car-div',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-            miniCarMarker.setIcon(carIcon);
-        }
-        // -------------------------
-
         let dist = lastCoords ? calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude) : 0;
 
         const currSpeedEl = document.getElementById('currSpeed');
@@ -1107,6 +1115,7 @@
             
             if (currentMode === 'NAV' && navWaypoints.length > 0) {
                 if (navStarted) {
+                    // FIX: Path-based Catch-Up Sweep on Resume (Preserves Time & Total Dist)
                     let currentPathIdx = findClosestPathIndex(latitude, longitude);
                     let foundNextWp = activeWpIndex;
                     
@@ -1119,10 +1128,12 @@
                     }
                     activeWpIndex = foundNextWp;
 
+                    // Recalculate true path distance to the next waypoint
                     if (navWaypoints[activeWpIndex]) {
                         let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
                         partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                     }
+                // FIX: Protect the index from resetting if we are transiting to STOP
                 } else if (!window.isPostFlying) {
                     activeWpIndex = 0;
                 }
@@ -1154,7 +1165,9 @@
             const startPoint = navWaypoints[0];
             const distToStartGate = calculateHaverDist(latitude, longitude, startPoint.lat, startPoint.lon);
 
+            // FIX: Radar is completely deactivated if we are in Post-Flying mode
             if (!navStarted && !window.isPostFlying) {
+                // Determine if we are physically on the track but far from the start line
                 let minPathDist = 999;
                 if (navPathCoords.length > 0) {
                     for (let pt of navPathCoords) {
@@ -1164,6 +1177,7 @@
                 }
 
                 if (distToStartGate <= 0.015) { 
+                    // NORMAL START GATE ENTRANCE
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
@@ -1181,11 +1195,13 @@
                         speak("Next waypoint, " + nextCleanName + " in " + partialDist.toFixed(2) + " kilometers");
                     }
                 } else if (minPathDist <= 0.035 && distToStartGate > 0.050) {
+                    // HOT JOIN: MID-STAGE ENTRANCE
                     navStarted = true;
                     sessionStartTime = Date.now();
                     startTimer();
                     speak("Stage joined mid path");
                     
+                    // Find the next upcoming waypoint based on the path direction
                     let currentPathIdx = findClosestPathIndex(latitude, longitude);
                     let foundNextWp = 1;
                     for (let i = 1; i < navWaypoints.length; i++) {
@@ -1208,6 +1224,7 @@
                         speak("Next waypoint, " + nextCleanName + " in " + partialDist.toFixed(2) + " kilometers");
                     }
                 } else {
+                    // WAITING TO START OR NOT ON TRACK
                     document.getElementById('partial').innerText = distToStartGate.toFixed(2);
                     document.getElementById('total').innerText = "0.00";
                 }
@@ -1219,18 +1236,19 @@
                 let trackDistanceToFinish = calculateDistanceAlongPath(currentPathIdx, finishPathIdx);
                 document.getElementById('total').innerText = trackDistanceToFinish.toFixed(2);
 
+                // FIX: Dynamic Visual Progress Bar on the Top Button
                 if (window.lastFinishIdx !== finishPathIdx) {
                     window.fullStageDist = calculateDistanceAlongPath(0, finishPathIdx);
                     window.lastFinishIdx = finishPathIdx;
                 }
                 if (window.fullStageDist > 0) {
                     let progressPct = ((1 - (trackDistanceToFinish / window.fullStageDist)) * 100);
-                    progressPct = Math.round(progressPct / 5) * 5; 
+                    progressPct = Math.round(progressPct / 5) * 5; // Snap to 5% increments
                     if (progressPct > 100) progressPct = 100;
                     if (progressPct < 0) progressPct = 0;
                     
                     document.getElementById('importBtn').style.background = `linear-gradient(to right, #34a853 ${progressPct}%, rgba(52, 168, 83, 0.3) ${progressPct}%)`;
-                    document.getElementById('importBtn').style.border = "1px solid #34a853"; 
+                    document.getElementById('importBtn').style.border = "1px solid #34a853"; // Keeps the button edge crisp
                 }
 
                 let minPathDist = 999;
@@ -1262,6 +1280,7 @@
                                 clearInterval(wrongWayInterval);
                                 wrongWayInterval = null;
                             }
+                            // HARD FLUSH: Instantly kill any queued speech when the car stops
                             window.speechSynthesis.cancel();
                             
                             if (!wasSpeedZeroTriggered) {
@@ -1276,18 +1295,20 @@
                                     upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
                                 }
                                 let displacementM = calculateHaverDist(upstreamAnchor.lat, upstreamAnchor.lon, latitude, longitude) * 1000;
+                                // FAST TRIGGER: Reduced from 20m to 8m so the first warning fires almost immediately
                                 if (displacementM >= 8) { 
                                     isWrongWay = true;
                                     wasSpeedZeroTriggered = false;
                                     document.body.classList.add('panic-mode');
                                     document.getElementById('partialLabel').innerText = "WRONG WAY!";
-                                    window.speechSynthesis.cancel(); 
+                                    window.speechSynthesis.cancel(); // Flush before speaking
                                     triggerWrongWayAudioLoop();
                                 }
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor && !window.isReverseMode) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
+                                // FAST AUSTERE LOOP: Reduced from 20m to 10m to trigger "Listen!" immediately after resuming wrong way
                                 if (secondaryDisplacementM >= 10 && !isAustereLoopRunning) {
-                                    window.speechSynthesis.cancel(); 
+                                    window.speechSynthesis.cancel(); // Flush before speaking
                                     triggerAustereAudioLoop();
                                 }
                             }
@@ -1295,18 +1316,21 @@
                             upstreamAnchor = null; 
                             
                             if (isWrongWay) {
+                                // INSTANT SILENCE the millisecond you face the right direction
                                 if (wrongWayInterval) {
                                     clearInterval(wrongWayInterval);
                                     wrongWayInterval = null;
                                 }
                                 window.speechSynthesis.cancel(); 
                                 
+                                // Set a fresh anchor exactly where you complete the U-turn
                                 if (!wasSpeedZeroTriggered) {
                                     zeroSpeedAnchor = { lat: latitude, lon: longitude };
                                     wasSpeedZeroTriggered = true; 
                                 }
                                 
                                 let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
+                                // FAST RECOVERY: Reduced from 20m to 15m for quick "Correct direction" confirmation
                                 if (recoveryDisplacementM >= 15) { 
                                     stopWrongWayAudioLoop();
                                     document.body.classList.remove('panic-mode');
@@ -1316,7 +1340,7 @@
                             }
                         }
                     }
-                } 
+                } // <--- Here is the 5th bracket that closes the giant minPathDist <= 0.035 block!
 
                 if (minPathDist > 0.08) { 
                     if (isWrongWay) stopWrongWayAudioLoop(); 
@@ -1345,9 +1369,11 @@
                         document.getElementById('partialLabel').innerText = "Distance to WP";
                         announceBackOnTrackDouble(); 
                         
+                        // FIX: Waypoint Catch-Up (Re-sync after returning to track)
                         let currentPathIdx = findClosestPathIndex(latitude, longitude);
                         let foundNextWp = activeWpIndex;
                         
+                        // FIX: Omnidirectional Sweep (Re-sync even if returning backwards on the stage)
                         for (let i = 0; i < navWaypoints.length; i++) {
                             let wpPathIdx = findClosestPathIndex(navWaypoints[i].lat, navWaypoints[i].lon);
                             if (wpPathIdx > currentPathIdx) {
@@ -1356,6 +1382,7 @@
                             }
                         }
                         
+                        // If we skipped waypoints, snap to the correct one and recalculate partial
                         if (foundNextWp !== activeWpIndex) {
                             activeWpIndex = foundNextWp;
                             updateTargetDisplay();
@@ -1373,6 +1400,7 @@
                     }
                 }
 
+                // 30-Meter Stay-on-Screen Evaluation Framework
                 if (clearedWpIndex !== null && clearedWpLat !== null && clearedWpLon !== null) {
                     let distanceFromClearedM = calculateHaverDist(latitude, longitude, clearedWpLat, clearedWpLon) * 1000;
                     if (distanceFromClearedM >= 30) {
@@ -1388,10 +1416,13 @@
                 if (!isOffTrack && !isWrongWay) {
                     const target = navWaypoints[activeWpIndex];
                     if (target) {
+                        // FIX: Apply the 2-meter noise gate to prevent GPS drift while stopped
                         if (dist > 0.002) {
                             partialDist -= dist; 
                         }
                         
+                        // FIX: "Endless Loop" Safety Net. Path distance can never be physically shorter than a straight line.
+                        // If path math inverses, this instantly heals the variable and stops false triggers.
                         let directDist = calculateHaverDist(latitude, longitude, target.lat, target.lon);
                         if (partialDist < directDist) {
                             partialDist = directDist;
@@ -1407,6 +1438,7 @@
                         const cleanNote = target.desc ? target.desc.replace(/<[^>]*>/g, '').trim() : "";
                         const tulipNote = cleanNote ? `, ${cleanNote}` : "";
 
+                        // Audio latency offset for Greek language (20 meters = ~1 second head start at 80 km/h)
                         let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
                         let offset = isGreek ? 20 : 0; 
 
@@ -1433,19 +1465,23 @@
                         
                         let isFlying = target.name.toUpperCase().includes("FLYING");
                         let baseTrigger = isFlying ? 10 : 35;
-                        let triggerDist = baseTrigger + (isFlying ? 0 : offset); 
+                        let triggerDist = baseTrigger + (isFlying ? 0 : offset); // Never offset the flying finish beep
 
                         if (distM <= triggerDist) {
                             if (isFlying) {
+                                // 1. Instant Millisecond Laser Beep
                                 playFinishBeep();
                                 
+                                // 2. Ignite Fireworks Visuals on Tulip Box
                                 const tulipBox = document.getElementById('tulipLiveBox');
                                 tulipBox.classList.add('fireworks-active');
-                                setTimeout(() => { tulipBox.classList.remove('fireworks-active'); }, 10000); 
+                                setTimeout(() => { tulipBox.classList.remove('fireworks-active'); }, 10000); // Burns out after 10s
 
+                                // 3. Telemetry Collection
                                 let finalTime = document.getElementById('timer').innerText;
                                 let finalAvgSpeed = document.getElementById('speed').innerText;
                                 
+                                // 4. The Grand Announcement
                                 speak("Special Stage Finished! Top speed: " + Math.round(maxSpeedAchieved) + " kilometers per hour. Average speed: " + finalAvgSpeed + ". Time: " + finalTime + ". Outstanding drive!");
 
                                 activeWpIndex++; 
@@ -1455,8 +1491,10 @@
                                 sessionStartTime = null;
                                 navStarted = false;
                                 
+                                // Reset Telemetry for next stage
                                 maxSpeedAchieved = 0;
                                 
+                                // FIX: Enter Post-Flying mode to track distance to STOP
                                 window.isPostFlying = true;
                                 partialDist = 0; 
                                 document.getElementById('partialLabel').innerText = "TO STOP (KM)";
@@ -1469,14 +1507,17 @@
                                 navBtn.style.background = "#555";
                                 return;
                             } else {
+                                // Normal Waypoint Speech
                                 speak("Arrived at " + cleanName + tulipNote);
                             }
 
+                            // Capture coordinates and index to pin image to panel for 30m before updating visual asset
                             clearedWpIndex = activeWpIndex;
                             clearedWpLat = target.lat;
                             clearedWpLon = target.lon;
 
                             activeWpIndex++;
+                            // FIX: Reset partial countdown along the path coordinates for the next upcoming waypoint
                             if (navWaypoints[activeWpIndex]) {
                                 let currentPathIdx = findClosestPathIndex(latitude, longitude);
                                 let nextWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
@@ -1496,6 +1537,7 @@
                                     let nextTarget = navWaypoints[activeWpIndex];
                                     let nextName = formatWpName(nextTarget.name);
                                     
+                                    // FIX: Sync voice with the true road path distance instead of a direct line
                                     let nextDist = partialDist; 
                                     speak("Distance to " + nextName + " is " + nextDist.toFixed(2) + " kilometers");
                                     
@@ -1544,6 +1586,7 @@
        if (isAutoPaused || !lastCoords) return;
         const d = calculateHaverDist(lastCoords.lat, lastCoords.lon, latitude, longitude);
         if (d > 0.002) {
+            // FIX: If a route is loaded, do not let REC mode increment distances and corrupt NAV variables
             if (currentMode === 'REC') {
                 if (navWaypoints.length === 0) {
                     totalDist += d;
@@ -1553,6 +1596,7 @@
                 totalDist += d; 
             }
             
+            // FIX: Keep counting partial distance upwards to the STOP point
             if (currentMode === 'NAV' && window.isPostFlying) {
                 partialDist += d;
                 document.getElementById('partial').innerText = partialDist.toFixed(2);
@@ -1651,6 +1695,7 @@
             accuracyAchieved = false;
             isManualPaused = false;
             
+            // GATEKEEPER CHECK: Ensure route is pre-loaded before starting
             if (!window.appIsReady) {
                 speak("Route not loaded. Wait for READY status.");
                 return;
@@ -1877,6 +1922,7 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml], {type:'application/vnd.google-earth.kml+xml'})); a.download = `${fileName}.kml`; a.click();
     }
 
+    // --- MEMORY WIPE LOGIC ---
     const wipeBtn = document.getElementById('wipeBtn');
     let wipeProgress = 0;
     let wipeInterval;
@@ -1885,6 +1931,7 @@
         e.preventDefault();
         wipeProgress = 0;
         
+        // 60ms * 50 intervals = 3000ms (3 seconds)
         wipeInterval = setInterval(() => {
             wipeProgress += 2;
             wipeBtn.style.background = `linear-gradient(to right, #ea4335 ${wipeProgress}%, #8b0000 ${wipeProgress}%)`;
@@ -1904,22 +1951,26 @@
     }
 
     function executeFullWipe() {
+        // Instead of wiping instantly, open the confirmation popup
         document.getElementById('wipeConfirmModal').style.display = 'flex';
     }
 
     function confirmWipeNo() {
+        // If NO: close the popup and reset the button color
         document.getElementById('wipeConfirmModal').style.display = 'none';
         wipeBtn.style.background = "#8b0000";
         wipeProgress = 0;
     }
 
     function confirmWipeYes() {
+        // If YES: hide popup, speak, wait 2.5 seconds, then wipe!
         document.getElementById('wipeConfirmModal').style.display = 'none';
         speak("Memory vault cleared from route.");
         
-        window.offlineImageCache = {}; 
-        localStorage.removeItem('stagemaster_vault'); 
+        window.offlineImageCache = {}; // Flush the Blob images from active RAM
+        localStorage.removeItem('stagemaster_vault'); // Destroy the persistent save state
         
+        // Wait 2500 milliseconds (2.5s) to allow the voice to finish speaking before refreshing
         setTimeout(() => {
             location.reload(); 
         }, 2500); 
@@ -1929,12 +1980,15 @@
     wipeBtn.addEventListener('touchend', cancelWipeTimer);
     wipeBtn.addEventListener('touchcancel', cancelWipeTimer);
     
+    // --- WIPE BUTTON VISIBILITY OVERRIDES ---
+    // Inject visibility into startImport success
     const originalStartImport = startImport;
     startImport = async function(event) {
         await originalStartImport(event);
         document.getElementById('wipeBtn').style.display = 'block';
     };
 
+    // Inject visibility into state recovery
     const originalCheckStateRecovery = checkStateRecovery;
     checkStateRecovery = function() {
         originalCheckStateRecovery();
@@ -1943,13 +1997,17 @@
         }
     };
 
+// --- WAYPOINT COUNTERS LOGIC ---
     function updateWpCounters() {
         let rp = 0, nos = 0, marshal = 0;
         let activeWps = [];
 
+        // LIVE COUNTDOWN LOGIC:
         if (typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) {
+            // Route Loaded: Slice the list to ONLY look at waypoints we haven't reached yet
             activeWps = navWaypoints.slice(activeWpIndex); 
         } else {
+            // Manual Recording: Count normally
             activeWps = waypoints;
         }
         
@@ -1966,30 +2024,36 @@
         document.getElementById('count-marshal').innerText = marshal;
     }
 
+    // Connect the counters to button clicks
     const originalMark = mark;
     mark = function(type) {
         originalMark(type);
         updateWpCounters();
     };
 
+    // Connect the counters to app load/vault recovery
     const originalCheckStateRecoveryCounters = checkStateRecovery;
     checkStateRecovery = function() {
         originalCheckStateRecoveryCounters();
         updateWpCounters();
     };
 
+    // --- FORCE REFRESH ON MODE SWITCH ---
     const originalSwitchMode = switchMode;
     switchMode = function(mode) {
         originalSwitchMode(mode);
         updateWpCounters();
-    };
+    };// Logic to handle the button click
 
+    // Zero out the counters when the vault is cleared (Export or Long-Press Reset)
     const originalClearVault = clearVault;
     clearVault = function() {
         originalClearVault();
         updateWpCounters();
     };
 
+    // --- LIVE COUNTDOWN TRIGGER HOOK ---
+    // Every time the target changes, refresh the numbers to tick them down
     const originalUpdateTargetDisplayCounters = updateTargetDisplay;
     updateTargetDisplay = function() {
         originalUpdateTargetDisplayCounters();
@@ -1998,5 +2062,6 @@
         }
     };
 </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
