@@ -1091,7 +1091,7 @@
             triggerDynamicArrowHUD(latitude, longitude, curSpeed, gpsHeading);
         }
 
-        / --- FEED MAP TRACKING (WRAPPED TO PREVENT LOOP CRASHES) ---
+        // --- FEED MAP TRACKING (WRAPPED TO PREVENT LOOP CRASHES) ---
         try {
             if (typeof liveMap !== 'undefined' && liveMap) {
                 liveMap.invalidateSize(); // This line forces the grey box to load the tiles!
