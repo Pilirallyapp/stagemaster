@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.08</title>
+    <title>StageMaster 7.10</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -41,9 +41,9 @@
         .wp-counter { position: absolute; top: 12px; right: 15px; font-size: 0.85rem; font-weight: bold; background: rgba(20,20,20,0.9); padding: 2px 7px; border-radius: 8px; z-index: 4; border: 1px solid #555; }
 
         /* Isolated Dynamic Tulip Box Structure */
-        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
-        .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; display: none !important; }
-        #liveMap { display: block !important; width: 100%; height: 100%; border-radius: 13px; }
+        .tulip-preview-container { display: none; position: relative; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+        .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; display: none !important; position: relative; z-index: 2; }
+        #liveMap { display: block !important; width: 650px; height: 650px; position: absolute; top: 50%; left: 50%; margin-top: -325px; margin-left: -325px; }
         
         /* Compass Arrow Shock Absorber & Panic Flash */
         .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; }
@@ -1097,13 +1097,22 @@
         // --- FEED MAP TRACKING (WRAPPED TO PREVENT LOOP CRASHES) ---
         try {
             if (typeof liveMap !== 'undefined' && liveMap) {
-                liveMap.invalidateSize(); // This line forces the grey box to load the tiles!
+                liveMap.invalidateSize(); 
                 liveMap.setView([latitude, longitude], 18); 
+                
+                // 1. Rotate the hidden oversized map container opposite to your heading
+                let mapContainer = document.getElementById('liveMap');
+                if (mapContainer) {
+                    mapContainer.style.transformOrigin = "center center";
+                    mapContainer.style.transform = `rotate(${-activeHeading}deg)`; 
+                }
+
                 if (typeof mapCarMarker !== 'undefined' && mapCarMarker) {
                     mapCarMarker.setLatLng([latitude, longitude]);
                     let mapCarImg = document.getElementById('mapCarImg');
                     if (mapCarImg) {
-                        mapCarImg.style.transform = `rotate(0deg)`;
+                        // 2. Counter-rotate the car so it cancels out the map rotation and stays pointing UP
+                        mapCarImg.style.transform = `rotate(${activeHeading}deg)`;
                     }
                 }
             }
