@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.07</title>
+    <title>StageMaster 7.08</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -202,7 +202,7 @@
         <div id="liveMap" style="width: 100%; height: 100%; display: none; border-radius: 13px;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.07</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.08</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -458,10 +458,13 @@
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '' }).addTo(liveMap);
         
         let carIcon = L.divIcon({
-            html: `<img id="mapCarImg" src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:30px;height:30px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
+            // 1. Change width and height here to 60px
+            html: `<img id="mapCarImg" src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
             className: 'custom-car-div',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
+            // 2. Change the Leaflet boundary box to match [60, 60]
+            iconSize: [60, 60],
+            // 3. CRITICAL: Change the anchor to exactly HALF the size [30, 30] so the GPS dot stays dead-center in the car!
+            iconAnchor: [30, 30]
         });
         mapCarMarker = L.marker([38.052, 23.828], { icon: carIcon, zIndexOffset: 1000 }).addTo(liveMap);
     }
