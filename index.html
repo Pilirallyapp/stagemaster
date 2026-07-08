@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.05</title>
+    <title>StageMaster 7.06</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -41,9 +41,9 @@
         .wp-counter { position: absolute; top: 12px; right: 15px; font-size: 0.85rem; font-weight: bold; background: rgba(20,20,20,0.9); padding: 2px 7px; border-radius: 8px; z-index: 4; border: 1px solid #555; }
 
         /* Isolated Dynamic Tulip Box Structure */
-        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; position: relative; }
+        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; display: none !important; }
-        #liveMap { display: block !important; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; border-radius: 13px; transform-origin: center center; transition: transform 0.1s linear; }
+        #liveMap { display: block !important; width: 100%; height: 100%; border-radius: 13px; }
         
         /* Compass Arrow Shock Absorber & Panic Flash */
         .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; }
@@ -199,10 +199,10 @@
 
     <div class="tulip-preview-container" id="tulipLiveBox">
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview" style="width: 100%; height: 100%; object-fit: contain;">
-        <div id="liveMap" style="display: none;"></div>
+        <div id="liveMap" style="width: 100%; height: 100%; display: none; border-radius: 13px;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.05</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.06</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -455,7 +455,7 @@
     function initMap() {
         if (liveMap) return;
         liveMap = L.map('liveMap', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false }).setView([38.052, 23.828], 18);
-        // TILE LAYER REMOVED FOR MAXIMUM PERFORMANCE & GREY BACKGROUND
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '' }).addTo(liveMap);
         
         let carIcon = L.divIcon({
             html: `<img id="mapCarImg" src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:30px;height:30px;transform: rotate(0deg); display: block; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
@@ -1094,17 +1094,13 @@
         // --- FEED MAP TRACKING (WRAPPED TO PREVENT LOOP CRASHES) ---
         try {
             if (typeof liveMap !== 'undefined' && liveMap) {
+                liveMap.invalidateSize(); // This line forces the grey box to load the tiles!
                 liveMap.setView([latitude, longitude], 18); 
-                
-                // ROTATE MAP OPPOSITE TO HEADING (TRACK-UP ORIENTATION)
-                document.getElementById('liveMap').style.transform = `rotate(${-activeHeading}deg)`;
-
                 if (typeof mapCarMarker !== 'undefined' && mapCarMarker) {
                     mapCarMarker.setLatLng([latitude, longitude]);
                     let mapCarImg = document.getElementById('mapCarImg');
                     if (mapCarImg) {
-                        // COUNTER-ROTATE CAR SO IT ALWAYS FACES NORTH/UP ON THE SCREEN
-                        mapCarImg.style.transform = `rotate(${activeHeading}deg)`;
+                        mapCarImg.style.transform = `rotate(0deg)`;
                     }
                 }
             }
