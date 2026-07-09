@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.08</title>
+    <title>StageMaster 7.12</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -41,9 +41,8 @@
         .wp-counter { position: absolute; top: 12px; right: 15px; font-size: 0.85rem; font-weight: bold; background: rgba(20,20,20,0.9); padding: 2px 7px; border-radius: 8px; z-index: 4; border: 1px solid #555; }
 
         /* Isolated Dynamic Tulip Box Structure */
-        .tulip-preview-container { display: none; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
-        .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; display: none !important; }
-        #liveMap { display: block !important; width: 100%; height: 100%; border-radius: 13px; }
+        .tulip-preview-container { display: none; position: relative; background: #1a1a1a; border: 2px solid #555; border-radius: 15px; width: 100%; height: 100px; margin-top: 10px; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; z-index: 1; }
+        .tulip-preview-container img { width: 100%; height: 100%; object-fit: contain; display: none !important; position: relative; z-index: 5; }
         
         /* Compass Arrow Shock Absorber & Panic Flash */
         .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; }
@@ -198,11 +197,15 @@
     </div>
 
     <div class="tulip-preview-container" id="tulipLiveBox">
-        <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview" style="width: 100%; height: 100%; object-fit: contain;">
-        <div id="liveMap" style="width: 100%; height: 100%; display: none; border-radius: 13px;"></div>
+        <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview" style="width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 5;">
+        <div id="mapViewport" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; display: none; border-radius: 13px; z-index: 1;">
+            <div id="mapRotator" style="position: absolute; top: 50%; left: 50%; width: 600px; height: 600px; margin-top: -300px; margin-left: -300px; transition: transform 0.2s linear; transform: rotate(0deg);">
+                <div id="liveMap" style="width: 100%; height: 100%; background-color: #3d3d3d;"></div>
+            </div>
+        </div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.08</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.12</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -472,7 +475,7 @@
    function renderTulipPreview(descText) {
         const liveBox = document.getElementById('tulipLiveBox');
         const liveImg = document.getElementById('tulipLiveImg');
-        const mapDiv = document.getElementById('liveMap');
+        const mapDiv = document.getElementById('mapViewport');
         
         if (currentMode !== 'NAV' || !navStarted) {
             liveBox.style.display = 'none';
@@ -999,7 +1002,7 @@
     function triggerDynamicArrowHUD(lat, lon, currentSpeed, gpsHeading) {
         const liveBox = document.getElementById('tulipLiveBox');
         const liveImg = document.getElementById('tulipLiveImg');
-        const mapDiv = document.getElementById('liveMap');
+        const mapDiv = document.getElementById('mapViewport');
         if (currentMode !== 'NAV') return;
 
         let arrowMode = false;
@@ -1097,13 +1100,19 @@
         // --- FEED MAP TRACKING (WRAPPED TO PREVENT LOOP CRASHES) ---
         try {
             if (typeof liveMap !== 'undefined' && liveMap) {
-                liveMap.invalidateSize(); // This line forces the grey box to load the tiles!
+                liveMap.invalidateSize(); 
                 liveMap.setView([latitude, longitude], 18); 
+                
+                let mapRotator = document.getElementById('mapRotator');
+                if (mapRotator) {
+                    mapRotator.style.transform = `rotate(${-activeHeading}deg)`; 
+                }
+
                 if (typeof mapCarMarker !== 'undefined' && mapCarMarker) {
                     mapCarMarker.setLatLng([latitude, longitude]);
                     let mapCarImg = document.getElementById('mapCarImg');
                     if (mapCarImg) {
-                        mapCarImg.style.transform = `rotate(0deg)`;
+                        mapCarImg.style.transform = `rotate(${activeHeading}deg)`;
                     }
                 }
             }
