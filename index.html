@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.15</title>
+    <title>StageMaster 7.16</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -202,7 +202,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.15</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.16</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -472,7 +472,7 @@
    function renderTulipPreview(descText) {
         const liveBox = document.getElementById('tulipLiveBox');
         const liveImg = document.getElementById('tulipLiveImg');
-        const mapDiv = document.getElementById('liveMap');
+        const mapDiv = document.getElementById('mapViewport');
         
         if (currentMode !== 'NAV' || !navStarted) {
             liveBox.style.display = 'none';
@@ -504,18 +504,22 @@
             imageUrl = extractTulipImageUrl(navWaypoints[targetIndex].desc);
         }
 
-        if (!imageUrl && typeof loadedKmlName !== 'undefined' && loadedKmlName) {
-            let repo = loadedKmlName.split('/').pop().replace(".kml", "").trim();
-            imageUrl = `https://raw.githubusercontent.com/Pilirallyapp/${repo}/main/${wpRawName}.png`;
-        }
+        // We REMOVED the "blind guessing" block here so it doesn't force a broken image!
 
         if (imageUrl) {
             liveImg.src = imageUrl;
-            liveImg.style.display = 'block'; 
+            // Added safety net: if an image URL is bad, instantly hide it and show the map!
+            liveImg.onerror = function() {
+                this.style.display = 'none';
+                if (mapDiv) mapDiv.style.display = 'block';
+            };
+            liveImg.style.display = 'block';
+            if (mapDiv) mapDiv.style.display = 'none';
             liveBox.style.display = 'flex';
         } else {
-            liveImg.style.display = 'none';  
+            liveImg.style.display = 'none';
             liveImg.src = "";
+            if (mapDiv) mapDiv.style.display = 'block';
             liveBox.style.display = 'flex';
             
             if (!liveMap) initMap();
