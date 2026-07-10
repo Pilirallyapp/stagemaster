@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.21</title>
+    <title>StageMaster 7.22</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -236,7 +236,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.21</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.22</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -259,7 +259,7 @@
         <div id="setupModalTitle" style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">ROUTE SETUP</div>
         
         <div id="setupDirectionLabel" style="color: #aaa; font-size: 0.8rem; margin-bottom: 5px; text-align: left; font-weight: bold;">DIRECTION</div>
-        <select id="setupDirection" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
+        <select id="setupDirection" onchange="autoSelectEntryPoint()" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
             <option value="normal">NORMAL (Start to Finish)</option>
             <option value="reverse">REVERSE (Disable Alarm)</option>
         </select>
@@ -830,6 +830,36 @@
         const btn = document.getElementById('importBtn');
         btn.innerText = isGreek ? "ΕΙΣΑΓΩΓΗ ΔΙΑΔΡΟΜΗΣ KML" : "IMPORT KML PATH";
         btn.style.backgroundColor = "#1a73e8";
+    }
+
+    function autoSelectEntryPoint() {
+        let dir = document.getElementById('setupDirection').value;
+        let select = document.getElementById('setupEntryPoint');
+        
+        if (dir === 'reverse') {
+            // Find the Flying Finish waypoint index
+            let flyingIndex = -1;
+            for (let i = 0; i < rawWaypoints.length; i++) {
+                if (rawWaypoints[i].name.toUpperCase().includes("FLYING") || rawWaypoints[i].name.toUpperCase().includes("FINISH")) {
+                    flyingIndex = i;
+                    break;
+                }
+            }
+            // Fallback to the very last point if "FLYING" isn't explicitly in the name
+            if (flyingIndex === -1 && rawWaypoints.length > 0) {
+                flyingIndex = rawWaypoints.length - 1;
+            }
+            
+            // Set the dropdown to the found point
+            if (flyingIndex !== -1) {
+                select.value = flyingIndex;
+            }
+        } else {
+            // If NORMAL, automatically default back to the first point (Start)
+            if (rawWaypoints.length > 0) {
+                select.value = 0;
+            }
+        }
     }
 
     async function applyRouteSetup() {
