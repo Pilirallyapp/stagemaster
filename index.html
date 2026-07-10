@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.20</title>
+    <title>StageMaster 7.21</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -236,7 +236,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.20</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.21</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -893,12 +893,48 @@
         if (typeof liveMap === 'undefined' || !liveMap) {
             if (typeof initMap === 'function') initMap();
         }
+        
+        // 1. Clear old red line
         if (liveMap && window.mapRouteLine) {
             liveMap.removeLayer(window.mapRouteLine);
         }
+        
+        // 2. Clear old waypoint markers if they exist
+        if (window.mapWpMarkers && window.mapWpMarkers.length > 0) {
+            window.mapWpMarkers.forEach(marker => liveMap.removeLayer(marker));
+        }
+        window.mapWpMarkers = [];
+
+        // 3. Draw new red line and add the fixed-size icons
         if (liveMap && navPathCoords.length > 0) {
             let latlngs = navPathCoords.map(pt => [pt.lat, pt.lon]);
             window.mapRouteLine = L.polyline(latlngs, { color: '#ea4335', weight: 6, opacity: 0.8 }).addTo(liveMap);
+            
+            // Loop through loaded waypoints to place icons
+            navWaypoints.forEach((wp) => {
+                let iconUrl = null;
+                let searchStr = (wp.name + " " + wp.desc).toUpperCase();
+                
+                // Match the waypoint type to your existing ICONS dictionary
+                if (searchStr.includes("START")) iconUrl = ICONS.start;
+                else if (searchStr.includes("FLYING") || searchStr.includes("FINISH")) iconUrl = ICONS.finish;
+                else if (wp.type === "RP") iconUrl = ICONS.rp;
+                else if (wp.type === "NOS") iconUrl = ICONS.nos;
+                else if (wp.type === "MARSHAL") iconUrl = ICONS.s;
+
+                // If we found a matching icon, build it and pin it to the map
+                if (iconUrl) {
+                    let customIcon = L.icon({
+                        iconUrl: iconUrl,
+                        iconSize: [35, 35], // <-- Fixed size! Change these numbers to make them bigger/smaller
+                        iconAnchor: [17, 17] // Keeps the center of the image pinned to the exact GPS coordinate
+                    });
+                    
+                    // Add it to the map with a zIndex so it sits above the red line
+                    let marker = L.marker([wp.lat, wp.lon], { icon: customIcon, zIndexOffset: 500 }).addTo(liveMap);
+                    window.mapWpMarkers.push(marker); // Save it so we can delete it on the next import
+                }
+            });
         }
         
         updateTargetDisplay();
