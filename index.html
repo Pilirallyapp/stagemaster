@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.24</title>
+    <title>StageMaster 7.25</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -236,7 +236,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.24</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.25</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -265,7 +265,13 @@
         </select>
 
         <div id="setupEntryPointLabel" style="color: #aaa; font-size: 0.8rem; margin-bottom: 5px; text-align: left; font-weight: bold;">ENTRY POINT</div>
-        <select id="setupEntryPoint" style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
+        <select id="setupEntryPoint" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
+        </select>
+
+        <div id="setupNavViewLabel" style="color: #aaa; font-size: 0.8rem; margin-bottom: 5px; text-align: left; font-weight: bold;">NAVIGATION VIEW</div>
+        <select id="setupNavView" style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
+            <option value="map">USE MAP (Default)</option>
+            <option value="tulip">TULIP IMAGES</option>
         </select>
 
         <button id="setupLoadBtn" class="start-btn" style="height: 50px; margin-bottom: 10px;" onclick="applyRouteSetup()">LOAD ROUTE</button>
@@ -515,8 +521,8 @@
             return;
         }
 
-        // NEW: If Reverse Mode is active, bypass images and ALWAYS show the spinning map
-        if (window.isReverseMode) {
+        // NEW: If Reverse Mode is active OR user selected Map view, bypass images and ALWAYS show the spinning map
+        if (window.isReverseMode || window.navigationViewPreference === 'map') {
             liveImg.style.display = 'none';
             liveImg.src = "";
             if (mapDiv) mapDiv.style.display = 'block';
@@ -583,6 +589,7 @@
             upstreamAnchor, zeroSpeedAnchor, wasSpeedZeroTriggered, isAustereLoopRunning,
             clearedWpIndex, clearedWpLat, clearedWpLon,
             isReverseMode: window.isReverseMode || false,
+            navigationViewPreference: window.navigationViewPreference || 'map',
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -624,6 +631,7 @@
             clearedWpLat = state.clearedWpLat !== undefined ? state.clearedWpLat : null;
             clearedWpLon = state.clearedWpLon !== undefined ? state.clearedWpLon : null;
             window.isReverseMode = state.isReverseMode || false;
+            window.navigationViewPreference = state.navigationViewPreference || 'map';
 
             switchMode(state.currentMode || 'REC');
 
@@ -822,11 +830,18 @@
                 document.getElementById('setupModalTitle').innerText = "ΡΥΘΜΙΣΕΙΣ ΕΙΔΙΚΗΣ";
                 document.getElementById('setupDirectionLabel').innerText = "ΚΑΤΕΥΘΥΝΣΗ";
                 document.getElementById('setupEntryPointLabel').innerText = "ΣΗΜΕΙΟ ΕΙΣΟΔΟΥ";
+                let viewLabel = document.getElementById('setupNavViewLabel');
+                if (viewLabel) viewLabel.innerText = "ΟΨΗ ΠΛΟΗΓΗΣΗΣ";
                 document.getElementById('setupLoadBtn').innerText = "ΦΟΡΤΩΣΗ ΔΙΑΔΡΟΜΗΣ";
                 document.getElementById('setupCancelBtn').innerText = "ΑΚΥΡΩΣΗ";
                 let dirSelect = document.getElementById('setupDirection');
                 dirSelect.options[0].text = "ΚΑΝΟΝΙΚΗ (Εκκίνηση προς Τερματισμό)";
                 dirSelect.options[1].text = "ΑΝΑΠΟΔΑ (Απενεργοποίηση Συναγερμού)";
+                let viewSelect = document.getElementById('setupNavView');
+                if (viewSelect) {
+                    viewSelect.options[0].text = "ΧΡΗΣΗ ΧΑΡΤΗ (Προεπιλογή)";
+                    viewSelect.options[1].text = "ΕΙΚΟΝΕΣ TULIP";
+                }
             }
 
             document.getElementById('entrySetupModal').style.display = 'flex';
@@ -878,8 +893,10 @@
         
         let dir = document.getElementById('setupDirection').value;
         let wpIndex = parseInt(document.getElementById('setupEntryPoint').value);
+        let navView = document.getElementById('setupNavView').value;
         
         window.isReverseMode = (dir === 'reverse');
+        window.navigationViewPreference = navView;
         
         if (window.isReverseMode) {
             navWaypoints = rawWaypoints.slice(0, wpIndex + 1).reverse();
