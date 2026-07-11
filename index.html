@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.25</title>
+    <title>StageMaster 7.26</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -78,7 +78,7 @@
         #tulipLiveImg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 5; display: none; background: #1a1a1a; }
         
         /* Compass Arrow Shock Absorber & Panic Flash */
-        .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; }
+        .compass-arrow { transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 75px !important; height: 75px !important; background: transparent !important; }
         
         .panic-mode .compass-arrow { animation: panic-arrow-color 0.5s infinite; }
         @keyframes panic-arrow-color {
@@ -236,7 +236,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.25</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.26</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
