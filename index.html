@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.26</title>
+    <title>StageMaster 7.30</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -236,7 +236,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.26</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.30</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -269,10 +269,19 @@
         </select>
 
         <div id="setupNavViewLabel" style="color: #aaa; font-size: 0.8rem; margin-bottom: 5px; text-align: left; font-weight: bold;">NAVIGATION VIEW</div>
-        <select id="setupNavView" style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
+        <select id="setupNavView" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; background: #3d3d3d; color: white; border: none; font-size: 1rem; outline: none;">
             <option value="map">USE MAP (Default)</option>
             <option value="tulip">TULIP IMAGES</option>
         </select>
+
+        <div id="setupTargetSpeedLabel" style="color: #aaa; font-size: 0.8rem; margin-bottom: 5px; text-align: left; font-weight: bold;">TARGET AVG SPEED (REGULARITY)</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #3d3d3d; padding: 10px; border-radius: 8px; margin-bottom: 20px;">
+            <button onclick="adjustTargetSpeed(-10)" style="background: #555; color: white; width: 45px; height: 45px; border-radius: 8px; font-size: 1rem;">-10</button>
+            <button onclick="adjustTargetSpeed(-1)" style="background: #555; color: white; width: 45px; height: 45px; border-radius: 8px; font-size: 1rem;">-1</button>
+            <div id="setupTargetSpeedValue" style="color: #fbbc05; font-size: 1.4rem; font-weight: bold; font-family: monospace; text-align: center; flex: 1;">OFF</div>
+            <button onclick="adjustTargetSpeed(1)" style="background: #555; color: white; width: 45px; height: 45px; border-radius: 8px; font-size: 1rem;">+1</button>
+            <button onclick="adjustTargetSpeed(10)" style="background: #555; color: white; width: 45px; height: 45px; border-radius: 8px; font-size: 1rem;">+10</button>
+        </div>
 
         <button id="setupLoadBtn" class="start-btn" style="height: 50px; margin-bottom: 10px;" onclick="applyRouteSetup()">LOAD ROUTE</button>
             <button id="setupCancelBtn" class="stop-btn" style="background: #555; height: 50px;" onclick="cancelRouteSetup()">CANCEL</button>
@@ -842,6 +851,10 @@
                     viewSelect.options[0].text = "ΧΡΗΣΗ ΧΑΡΤΗ (Προεπιλογή)";
                     viewSelect.options[1].text = "ΕΙΚΟΝΕΣ TULIP";
                 }
+                let speedLabel = document.getElementById('setupTargetSpeedLabel');
+                if (speedLabel) speedLabel.innerText = "ΜΕΣΗ ΤΑΧΥΤΗΤΑ (REGULARITY)";
+                let speedValue = document.getElementById('setupTargetSpeedValue');
+                if (speedValue && window.targetAvgSpeed === 0) speedValue.innerText = "ΑΝΕΝΕΡΓΟ";
             }
 
             document.getElementById('entrySetupModal').style.display = 'flex';
@@ -858,7 +871,20 @@
         btn.style.backgroundColor = "#1a73e8";
     }
 
-    function autoSelectEntryPoint() {
+    window.targetAvgSpeed = 0; // 0 means OFF
+
+    function adjustTargetSpeed(delta) {
+        window.targetAvgSpeed += delta;
+        
+        // Prevent negative speeds
+        if (window.targetAvgSpeed <= 0) {
+            window.targetAvgSpeed = 0;
+            let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+            document.getElementById('setupTargetSpeedValue').innerText = isGreek ? "ΑΝΕΝΕΡΓΟ" : "OFF";
+        } else {
+            document.getElementById('setupTargetSpeedValue').innerText = window.targetAvgSpeed + " KM/H";
+        }
+    }
         let dir = document.getElementById('setupDirection').value;
         let select = document.getElementById('setupEntryPoint');
         
