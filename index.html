@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.32</title>
+    <title>StageMaster 7.33</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -234,9 +234,11 @@
     <div class="tulip-preview-container" id="tulipLiveBox">
         <div id="liveMap"></div>
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
+        <!-- REGULARITY HUD STRIP -->
+        <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.32</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.33</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -1048,6 +1050,82 @@
         document.getElementById('wipeBtn').style.display = 'block';
     }
 
+    // --- REGULARITY HUD LOGIC ---
+    window.isRegularityFlashActive = false;
+    window.regularityFlashTimeout = null;
+
+    function getBogeyTimeMs(wpIndex) {
+        if (window.targetAvgSpeed <= 0 || !navWaypoints[wpIndex] || navWaypoints.length === 0) return 0;
+        let startWpPathIdx = findClosestPathIndex(navWaypoints[0].lat, navWaypoints[0].lon);
+        let targetWpPathIdx = findClosestPathIndex(navWaypoints[wpIndex].lat, navWaypoints[wpIndex].lon);
+        let distFromStart = calculateDistanceAlongPath(startWpPathIdx, targetWpPathIdx);
+        return (distFromStart / window.targetAvgSpeed) * 3600000;
+    }
+
+    function updateRegularityHUD() {
+        const hud = document.getElementById('regularityHud');
+        if (!hud) return;
+        
+        if (currentMode !== 'NAV' || window.targetAvgSpeed <= 0 || !navStarted || window.isPostFlying) {
+            if (!window.isRegularityFlashActive) hud.style.display = 'none';
+            return;
+        }
+        
+        if (window.isRegularityFlashActive) return; // Don't overwrite an active flash
+
+        let bogeyMs = getBogeyTimeMs(activeWpIndex);
+        if (bogeyMs > 0) {
+            hud.style.display = 'block';
+            let sTotal = Math.round(bogeyMs / 1000);
+            let m = Math.floor(sTotal / 60);
+            let s = sTotal % 60;
+            let wpCleanName = formatWpName(navWaypoints[activeWpIndex].name);
+            hud.style.color = "#66b2ff"; // Bright Blue text for normal target
+            hud.innerText = `TARGET [${wpCleanName}]: ${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        } else {
+            hud.style.display = 'none';
+        }
+    }
+
+    function triggerRegularityFlash(wpIndex) {
+        const hud = document.getElementById('regularityHud');
+        if (!hud || window.targetAvgSpeed <= 0) return;
+        
+        let bogeyMs = getBogeyTimeMs(wpIndex);
+        if (bogeyMs <= 0) return; 
+
+        let elapsedMs = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+        let deltaSec = Math.round((elapsedMs - bogeyMs) / 1000);
+        let absSec = Math.abs(deltaSec);
+        
+        let flashText = "";
+        let flashColor = "";
+        let isGreek = (localStorage.getItem('stagemaster_language') === 'el');
+
+        if (absSec <= 2) { 
+            flashText = isGreek ? "ΤΕΛΕΙΟΣ ΧΡΟΝΟΣ" : "PERFECT TIME";
+            flashColor = "#34a853"; // Green
+        } else if (deltaSec > 2) {
+            flashText = isGreek ? `${absSec} ΔΕΥΤ. ΑΡΓΑ` : `${absSec} SECONDS LATE`;
+            flashColor = "#ea4335"; // Red
+        } else {
+            flashText = isGreek ? `${absSec} ΔΕΥΤ. ΝΩΡΙΣ` : `${absSec} SECONDS EARLY`;
+            flashColor = "#d500f9"; // Purple
+        }
+
+        window.isRegularityFlashActive = true;
+        hud.style.display = 'block';
+        hud.style.color = flashColor;
+        hud.innerText = flashText;
+
+        if (window.regularityFlashTimeout) clearTimeout(window.regularityFlashTimeout);
+        window.regularityFlashTimeout = setTimeout(() => {
+            window.isRegularityFlashActive = false;
+            updateRegularityHUD();
+        }, 8000); // Flashes for 8 seconds
+    }
+    // ----------------------------
+
     function updateTargetDisplay() {
         if (currentMode !== 'NAV') return;
         
@@ -1067,6 +1145,8 @@
         if (navWaypoints.length > 0) {
             document.getElementById('importBtn').innerText = `COMPLETED: ${activeWpIndex} / ${navWaypoints.length}`;
         }
+        
+        if (typeof updateRegularityHUD === 'function') updateRegularityHUD();
     }
 
     function calculateHaverDist(l1, lo1, l2, lo2) {
@@ -1663,6 +1743,13 @@
                         let triggerDist = baseTrigger + (isFlying ? 0 : offset); // Never offset the flying finish beep
 
                         if (distM <= triggerDist) {
+                            
+                            // --- REGULARITY PENALTY FLASH ---
+                            if (typeof triggerRegularityFlash === 'function') {
+                                triggerRegularityFlash(activeWpIndex);
+                            }
+                            // --------------------------------
+
                             if (isFlying) {
                                 // 1. Instant Millisecond Laser Beep
                                 playFinishBeep();
