@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.31</title>
+    <title>StageMaster 7.32</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -236,7 +236,7 @@
         <img id="tulipLiveImg" src="" alt="Tulip Roadbook Preview">
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.31</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.32</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -426,6 +426,12 @@
         if (m = t.match(/^Radio Point (\d+) saved at ([\d\.]+) kilometers$/)) return `Ο Ενδιάμεσος Κριτής ${m[1]} αποθηκεύτηκε στα ${m[2]} χιλιόμετρα`;
         if (m = t.match(/^S (\d+) saved at ([\d\.]+) kilometers$/)) return `Ο Φύλακας ${m[1]} αποθηκεύτηκε στα ${m[2]} χιλιόμετρα`;
         
+        // --- REGULARITY TRANSLATIONS ---
+        if (t === "Average speed on target. Hold this pace.") return "Μέση ταχύτητα εντός στόχου. Κράτα ρυθμό.";
+        if (m = t.match(/^Average speed high by (\d+) kilometers per hour\. Slow down\.$/)) return `Η μέση ταχύτητα είναι υψηλή κατά ${m[1]} χιλιόμετρα την ώρα. Κόψε ρυθμό.`;
+        if (m = t.match(/^Average speed low by (\d+) kilometers per hour\. Pick up the pace\.$/)) return `Η μέση ταχύτητα είναι χαμηλή κατά ${m[1]} χιλιόμετρα την ώρα. Ανέβασε ρυθμό.`;
+        // -------------------------------
+
         if (t.startsWith("Special Stage Finished!")) {
             m = t.match(/^Special Stage Finished! Top speed: (\d+) kilometers per hour\. Average speed: ([\d\.]+)\. Time: ([\d:]+)\. Outstanding drive!$/);
             if (m) return `Τερματισμός Ειδικής Διαδρομής! Μέγιστη ταχύτητα: ${m[1]} χιλιόμετρα την ώρα. Μέση ταχύτητα: ${m[2]}. Χρόνος: ${m[3]}. Καταπληκτική οδήγηση!`;
@@ -599,6 +605,8 @@
             clearedWpIndex, clearedWpLat, clearedWpLon,
             isReverseMode: window.isReverseMode || false,
             navigationViewPreference: window.navigationViewPreference || 'map',
+            targetAvgSpeed: window.targetAvgSpeed || 0,
+            regularityDistanceCounter: window.regularityDistanceCounter || 0,
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -641,6 +649,8 @@
             clearedWpLon = state.clearedWpLon !== undefined ? state.clearedWpLon : null;
             window.isReverseMode = state.isReverseMode || false;
             window.navigationViewPreference = state.navigationViewPreference || 'map';
+            window.targetAvgSpeed = state.targetAvgSpeed || 0;
+            window.regularityDistanceCounter = state.regularityDistanceCounter || 0;
 
             switchMode(state.currentMode || 'REC');
 
@@ -1365,6 +1375,7 @@
                     sessionStartTime = Date.now();
                     startTimer();
                     speak("The special stage has started");
+                    window.regularityDistanceCounter = 0; // Fresh reset for Regularity
                     activeWpIndex = 1;
                     updateTargetDisplay();
                     if (navWaypoints[activeWpIndex]) {
@@ -1778,6 +1789,31 @@
                 }
             } else if (currentMode === 'NAV' && navStarted) {
                 totalDist += d; 
+                
+                // --- REGULARITY 1-KILOMETER TRIGGER LOGIC ---
+                if (window.targetAvgSpeed > 0 && !window.isPostFlying) {
+                    if (typeof window.regularityDistanceCounter === 'undefined') window.regularityDistanceCounter = 0;
+                    window.regularityDistanceCounter += d; // Add distance to the hidden counter
+                    
+                    if (window.regularityDistanceCounter >= 1.0) { // When it hits 1 kilometer
+                        const elapsedMs = accumulatedTime + (sessionStartTime ? (Date.now() - sessionStartTime) : 0);
+                        if (elapsedMs > 0) {
+                            let currentAvgSpeed = totalDist / (elapsedMs / 3600000); // Overall stage average
+                            let diff = currentAvgSpeed - window.targetAvgSpeed;
+                            let absDiff = Math.round(Math.abs(diff));
+                            
+                            if (absDiff <= 1) { // 1 km/h tolerance buffer
+                                speak("Average speed on target. Hold this pace.");
+                            } else if (diff > 1) {
+                                speak("Average speed high by " + absDiff + " kilometers per hour. Slow down.");
+                            } else if (diff < -1) {
+                                speak("Average speed low by " + absDiff + " kilometers per hour. Pick up the pace.");
+                            }
+                        }
+                        window.regularityDistanceCounter = 0; // Reset for the next kilometer
+                    }
+                }
+                // --------------------------------------------
             }
             
             // FIX: Keep counting partial distance upwards to the STOP point
