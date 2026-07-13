@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.33</title>
+    <title>StageMaster 7.34</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -238,7 +238,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.33</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.34</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -1531,6 +1531,19 @@
                     if (d < minPathDist) minPathDist = d;
                 }
 
+                // --- GLOBAL WRONG WAY SILENCER ---
+                if (isWrongWay && curSpeed < 1.5) {
+                    if (wrongWayInterval) {
+                        clearInterval(wrongWayInterval);
+                        wrongWayInterval = null;
+                    }
+                    window.speechSynthesis.cancel(); 
+                    if (!wasSpeedZeroTriggered) {
+                        wasSpeedZeroTriggered = true;
+                        zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
+                    }
+                }
+
                 if (minPathDist <= 0.035 && !isOffTrack && lastCoords) {
                     let nextPathIdx = Math.min(currentPathIdx + 1, finishPathIdx);
                     let angleDiff = 0;
@@ -1548,41 +1561,26 @@
                         if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     }
 
-                    if (curSpeed < 1.5) {
-                        if (isWrongWay) {
-                            if (wrongWayInterval) {
-                                clearInterval(wrongWayInterval);
-                                wrongWayInterval = null;
-                            }
-                            // HARD FLUSH: Instantly kill any queued speech when the car stops
-                            window.speechSynthesis.cancel();
-                            
-                            if (!wasSpeedZeroTriggered) {
-                                wasSpeedZeroTriggered = true;
-                                zeroSpeedAnchor = { lat: latitude, lon: longitude }; 
-                            }
-                        }
-                    } else {
-                        if (angleDiff > 135) {
+                    if (curSpeed >= 1.5) { // Only do heading logic if moving
+                        if (angleDiff > 145) { // Increased to 145 to allow 90-degree intersection exits
                             if (!isWrongWay && !window.isReverseMode) {
                                 if (!upstreamAnchor) {
                                     upstreamAnchor = { lat: lastCoords.lat, lon: lastCoords.lon };
                                 }
                                 let displacementM = calculateHaverDist(upstreamAnchor.lat, upstreamAnchor.lon, latitude, longitude) * 1000;
-                                // FAST TRIGGER: Reduced from 20m to 8m so the first warning fires almost immediately
-                                if (displacementM >= 8) { 
+                                // Increased to 15m to prevent false alarms on quick side roads
+                                if (displacementM >= 15) { 
                                     isWrongWay = true;
                                     wasSpeedZeroTriggered = false;
                                     document.body.classList.add('panic-mode');
                                     document.getElementById('partialLabel').innerText = "WRONG WAY!";
-                                    window.speechSynthesis.cancel(); // Flush before speaking
+                                    window.speechSynthesis.cancel(); 
                                     triggerWrongWayAudioLoop();
                                 }
                             } else if (wasSpeedZeroTriggered && zeroSpeedAnchor && !window.isReverseMode) {
                                 let secondaryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
-                                // FAST AUSTERE LOOP: Reduced from 20m to 10m to trigger "Listen!" immediately after resuming wrong way
                                 if (secondaryDisplacementM >= 10 && !isAustereLoopRunning) {
-                                    window.speechSynthesis.cancel(); // Flush before speaking
+                                    window.speechSynthesis.cancel(); 
                                     triggerAustereAudioLoop();
                                 }
                             }
@@ -1590,21 +1588,18 @@
                             upstreamAnchor = null; 
                             
                             if (isWrongWay) {
-                                // INSTANT SILENCE the millisecond you face the right direction
                                 if (wrongWayInterval) {
                                     clearInterval(wrongWayInterval);
                                     wrongWayInterval = null;
                                 }
                                 window.speechSynthesis.cancel(); 
                                 
-                                // Set a fresh anchor exactly where you complete the U-turn
                                 if (!wasSpeedZeroTriggered) {
                                     zeroSpeedAnchor = { lat: latitude, lon: longitude };
                                     wasSpeedZeroTriggered = true; 
                                 }
                                 
                                 let recoveryDisplacementM = calculateHaverDist(zeroSpeedAnchor.lat, zeroSpeedAnchor.lon, latitude, longitude) * 1000;
-                                // FAST RECOVERY: Reduced from 20m to 15m for quick "Correct direction" confirmation
                                 if (recoveryDisplacementM >= 15) { 
                                     stopWrongWayAudioLoop();
                                     document.body.classList.remove('panic-mode');
@@ -1738,9 +1733,10 @@
                             wpMarkersHit.p50 = true;
                         }
                         
-                        let isFlying = target.name.toUpperCase().includes("FLYING");
-                        let baseTrigger = isFlying ? 10 : 35;
-                        let triggerDist = baseTrigger + (isFlying ? 0 : offset); // Never offset the flying finish beep
+                        // UNIVERSAL END LINE: Checks name OR if it is the absolute final waypoint of the stage
+                        let isEndLine = target.name.toUpperCase().includes("FLYING") || target.name.toUpperCase().includes("FINISH") || (activeWpIndex === navWaypoints.length - 1);
+                        let baseTrigger = isEndLine ? 10 : 35;
+                        let triggerDist = baseTrigger + (isEndLine ? 0 : offset); // Never offset the finish beep
 
                         if (distM <= triggerDist) {
                             
@@ -1750,7 +1746,7 @@
                             }
                             // --------------------------------
 
-                            if (isFlying) {
+                            if (isEndLine) {
                                 // 1. Instant Millisecond Laser Beep
                                 playFinishBeep();
                                 
