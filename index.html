@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.35</title>
+    <title>StageMaster 7.36</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -238,7 +238,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.35</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.36</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -609,6 +609,7 @@
             navigationViewPreference: window.navigationViewPreference || 'map',
             targetAvgSpeed: window.targetAvgSpeed || 0,
             regularityDistanceCounter: window.regularityDistanceCounter || 0,
+            isWalkMode: window.isWalkMode || false,
             timestamp: Date.now()
         };
         localStorage.setItem('stagemaster_vault', JSON.stringify(state));
@@ -653,6 +654,7 @@
             window.navigationViewPreference = state.navigationViewPreference || 'map';
             window.targetAvgSpeed = state.targetAvgSpeed || 0;
             window.regularityDistanceCounter = state.regularityDistanceCounter || 0;
+            window.isWalkMode = state.isWalkMode || false;
 
             switchMode(state.currentMode || 'REC');
 
@@ -983,6 +985,7 @@
         clearedWpIndex = null;
         clearedWpLat = null;
         clearedWpLon = null;
+        window.isWalkMode = false; // RESET WALK MODE FOR NEW ROUTE
         
         document.getElementById('tulipLiveBox').style.display = 'none';
         document.body.classList.remove('panic-mode');
@@ -1733,9 +1736,23 @@
                             wpMarkersHit.p50 = true;
                         }
                         
+                        // --- DYNAMIC WALK MODE LOCK ---
+                        // activeWpIndex is 1 when heading to the very first waypoint. 
+                        // Once we pass it (index 2+), the mode permanently locks.
+                        if (activeWpIndex <= 1) {
+                            window.isWalkMode = (maxSpeedAchieved < 10);
+                        }
+
                         // UNIVERSAL END LINE: Checks name OR if it is the absolute final waypoint of the stage
                         let isEndLine = target.name.toUpperCase().includes("FLYING") || target.name.toUpperCase().includes("FINISH") || (activeWpIndex === navWaypoints.length - 1);
                         let baseTrigger = isEndLine ? 10 : 35;
+
+                        // --- APPLY WALKING RECALIBRATION ---
+                        if (window.isWalkMode) {
+                            baseTrigger = 7; 
+                            offset = 0; // Completely disable language latency for walking
+                        }
+
                         let triggerDist = baseTrigger + (isEndLine ? 0 : offset); // Never offset the finish beep
 
                         if (distM <= triggerDist) {
