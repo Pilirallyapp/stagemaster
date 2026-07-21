@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.50</title>
+    <title>StageMaster 7.51</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.50</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.51</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -1435,18 +1435,24 @@
                 
                 // --- DYNAMIC ZOOM LOGIC ---
                 let activeZoom = 18; // Default fallback zoom
-                if (currentMode === 'NAV' && navStarted && !window.isPostFlying) {
-                    let currentDistM = partialDist * 1000;
-                    if (currentDistM > 1000) {
-                        activeZoom = 15; // > 1KM
-                    } else if (currentDistM > 500) {
-                        activeZoom = 16; // 500m - 1KM
-                    } else if (currentDistM > 200) {
-                        activeZoom = 17; // 200m - 500m
-                    } else if (currentDistM > 80) {
-                        activeZoom = 17.5; // 80m - 200m
+                if (currentMode === 'NAV' && !window.isPostFlying) {
+                    if (!navStarted) {
+                        // High zoom (15) while approaching the starting waypoint
+                        activeZoom = 15; 
                     } else {
-                        activeZoom = 18; // Under 80m (Final approach)
+                        // Dynamic zoom while stage is actively running
+                        let currentDistM = partialDist * 1000;
+                        if (currentDistM > 1000) {
+                            activeZoom = 15; // > 1KM
+                        } else if (currentDistM > 500) {
+                            activeZoom = 16; // 500m - 1KM
+                        } else if (currentDistM > 200) {
+                            activeZoom = 17; // 200m - 500m
+                        } else if (currentDistM > 80) {
+                            activeZoom = 17.5; // 80m - 200m
+                        } else {
+                            activeZoom = 18; // Under 80m (Final approach)
+                        }
                     }
                 }
 
