@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.40</title>
+    <title>StageMaster 7.41</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -101,7 +101,7 @@
         #regularitySummaryModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10005; justify-content: center; align-items: center; }
         .reg-summary-content { background: #2d2d2d; padding: 1.5rem; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 2px solid #555; position: relative; display: flex; flex-direction: column; max-height: 85vh; }
         .close-x-btn { position: absolute; top: 10px; right: 10px; width: 35px; height: 35px; border-radius: 50%; background: #444; border: 2px solid #666; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; line-height: 1; z-index: 10; }
-        .reg-table-container { overflow-y: auto; max-height: 250px; margin-bottom: 15px; border: 1px solid #444; border-radius: 8px; background: #1a1a1a; }
+        .reg-table-container { overflow-y: auto; max-height: 380px; margin-bottom: 15px; border: 1px solid #444; border-radius: 8px; background: #1a1a1a; }
         .reg-table { width: 100%; text-align: left; border-collapse: collapse; font-family: monospace; font-size: 0.9rem; }
         .reg-table th { padding: 8px 4px; border-bottom: 2px solid #555; color: #aaa; position: sticky; top: 0; background: #2d2d2d; }
         .reg-table td { padding: 10px 4px; border-bottom: 1px solid #333; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.40</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.41</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
