@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.52</title>
+    <title>StageMaster 7.55</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.52</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.55</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -866,6 +866,9 @@
                 }
             }
 
+            // THE FIX STEP 3: Automatically inject virtual points every 30 meters (0.030 km)
+            rawPathCoords = densifyPath(rawPathCoords, 0.030);
+
             // Populate the Dropdown Modal
             const select = document.getElementById('setupEntryPoint');
             select.innerHTML = '';
@@ -1271,6 +1274,32 @@
             total += calculateHaverDist(navPathCoords[i].lat, navPathCoords[i].lon, navPathCoords[i+1].lat, navPathCoords[i+1].lon);
         }
         return total;
+    }
+
+    // THE FIX STEP 3: Add the Densification Engine here
+    function densifyPath(coords, maxGapKm) {
+        let denseCoords = [];
+        if (coords.length === 0) return denseCoords;
+        
+        denseCoords.push(coords[0]);
+        for (let i = 0; i < coords.length - 1; i++) {
+            let p1 = coords[i];
+            let p2 = coords[i+1];
+            let dist = calculateHaverDist(p1.lat, p1.lon, p2.lat, p2.lon);
+            
+            if (dist > maxGapKm) {
+                let steps = Math.ceil(dist / maxGapKm);
+                for (let j = 1; j <= steps; j++) {
+                    let fraction = j / steps;
+                    let interpolatedLat = p1.lat + (p2.lat - p1.lat) * fraction;
+                    let interpolatedLon = p1.lon + (p2.lon - p1.lon) * fraction;
+                    denseCoords.push({ lat: interpolatedLat, lon: interpolatedLon });
+                }
+            } else {
+                denseCoords.push(p2);
+            }
+        }
+        return denseCoords;
     }
 
     function triggerWrongWayAudioLoop() {
