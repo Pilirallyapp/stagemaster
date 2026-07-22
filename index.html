@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.51</title>
+    <title>StageMaster 7.52</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.51</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.52</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -1715,6 +1715,36 @@
                                     document.body.classList.remove('panic-mode');
                                     document.getElementById('partialLabel').innerText = "Distance to WP";
                                     announceCorrectDirectionDouble();
+
+                                    // 1. Omnidirectional Sweep for U-Turns: Scan the whole path to find true position
+                                    let currentPathIdx = findClosestPathIndex(latitude, longitude);
+                                    let foundNextWp = activeWpIndex;
+                                    
+                                    for (let i = 0; i < navWaypoints.length; i++) {
+                                        let wpPathIdx = findClosestPathIndex(navWaypoints[i].lat, navWaypoints[i].lon);
+                                        if (wpPathIdx > currentPathIdx) {
+                                            foundNextWp = i;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // 2. Snap to the newly found WP if it changed after driving backwards
+                                    if (foundNextWp !== activeWpIndex) {
+                                        activeWpIndex = foundNextWp;
+                                        updateTargetDisplay();
+                                        
+                                        if (navWaypoints[activeWpIndex]) {
+                                            renderTulipPreview(navWaypoints[activeWpIndex].desc);
+                                            let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
+                                            speak("Re-synced. Next waypoint, " + nextCleanName);
+                                        }
+                                    }
+
+                                    // 3. THE FIX: ALWAYS recalculate the exact distance to that active waypoint
+                                    if (navWaypoints[activeWpIndex]) {
+                                        let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                                        partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
+                                    }
                                 }
                             }
                         }
@@ -1761,20 +1791,23 @@
                             }
                         }
                         
-                        // If we skipped waypoints, snap to the correct one and recalculate partial
+                        // 1. If we skipped waypoints, snap to the correct one and announce it
                         if (foundNextWp !== activeWpIndex) {
                             activeWpIndex = foundNextWp;
                             updateTargetDisplay();
-                            
+
                             if (navWaypoints[activeWpIndex]) {
                                 renderTulipPreview(navWaypoints[activeWpIndex].desc);
-                                
-                                let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
-                                partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                                 
                                 let nextCleanName = formatWpName(navWaypoints[activeWpIndex].name);
                                 speak("Re-synced. Next waypoint, " + nextCleanName);
                             }
+                        }
+
+                        // 2. THE FIX: ALWAYS recalculate the distance to the active waypoint when back on track
+                        if (navWaypoints[activeWpIndex]) {
+                            let targetWpPathIdx = findClosestPathIndex(navWaypoints[activeWpIndex].lat, navWaypoints[activeWpIndex].lon);
+                            partialDist = calculateDistanceAlongPath(currentPathIdx, targetWpPathIdx);
                         }
                     }
                 }
