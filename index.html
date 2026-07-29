@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.11</title>
+    <title>StageMaster 8.12</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.11</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.12</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2624,7 +2624,16 @@
         
         // 1. Initialize the Review Map if it hasn't been created yet
         if (!reviewMap) {
-            reviewMap = L.map('review-bottom-pane', { zoomControl: false }).setView([38.052, 23.828], 13);
+            reviewMap = L.map('review-bottom-pane', { 
+                zoomControl: false,
+                dragging: false,
+                touchZoom: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                tap: false 
+            }).setView([38.052, 23.828], 13);
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 maxZoom: 19, 
                 attribution: '' 
@@ -2869,22 +2878,12 @@
                     if (e.originalEvent && e.originalEvent.cancelable) e.originalEvent.preventDefault();
                     isScrubbing = true;
                     
-                    // NUCLEAR LOCK: Kill absolutely everything that makes the map move
-                    reviewMap.dragging.disable(); 
-                    reviewMap.touchZoom.disable();
-                    reviewMap.doubleClickZoom.disable();
-                    reviewMap.scrollWheelZoom.disable();
-                    reviewMap.boxZoom.disable();
-                    if (reviewMap.tap) reviewMap.tap.disable();
-                    
                     // Stop the browser from trying to scroll the page
                     bottomPane.style.touchAction = 'none';
                     document.body.style.overflow = 'hidden'; 
 
-                    if (e.latlng) {
-                        const index = findNearestReviewPoint(e.latlng.lat, e.latlng.lng);
-                        updateReviewUI(index, 'map_drag');
-                    }
+                    // Removed the instant jump command. 
+                    // The car will now wait for your finger to actually slide (via handleMove) before moving.
                 }
 
                 // Bind the touch events to the FAT line, the red line, and the car
@@ -2916,15 +2915,6 @@
                 function stopScrubbing(e) {
                     if (isScrubbing) {
                         isScrubbing = false;
-                        
-                        // UNLOCK EVERYTHING
-                        reviewMap.dragging.enable(); 
-                        reviewMap.touchZoom.enable();
-                        reviewMap.doubleClickZoom.enable();
-                        reviewMap.scrollWheelZoom.enable();
-                        reviewMap.boxZoom.enable();
-                        if (reviewMap.tap) reviewMap.tap.enable();
-                        
                         bottomPane.style.touchAction = 'auto';
                         document.body.style.overflow = 'auto';
                     }
