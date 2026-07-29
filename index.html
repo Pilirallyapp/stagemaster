@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.10</title>
+    <title>StageMaster 8.11</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.10</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.11</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2842,9 +2842,13 @@
                 }
                 // -----------------------------------
                 
-                // SCRUBBING LOGIC
+                // SCRUBBING LOGIC (THE "LOST CAUSE" FIX)
                 let isScrubbing = false;
                 const bottomPane = document.getElementById('review-bottom-pane');
+
+                // 1. Create a FAT transparent line over the red one so mobile fingers can actually hit it!
+                if (window.reviewFatLine) reviewMap.removeLayer(window.reviewFatLine);
+                window.reviewFatLine = L.polyline(latLngs, { color: 'transparent', weight: 40, opacity: 0 }).addTo(reviewMap);
 
                 let carImageUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/main/4x4.png';
                 let carIcon = L.divIcon({
@@ -2860,29 +2864,38 @@
                     zIndexOffset: 1000
                 }).addTo(reviewMap);
 
-                // THE FIX: Combine line tapping and car tapping into one master "Scrub Starter"
                 function startScrubbing(e) {
                     L.DomEvent.stopPropagation(e);
                     if (e.originalEvent && e.originalEvent.cancelable) e.originalEvent.preventDefault();
                     isScrubbing = true;
                     
-                    // Lock the map completely so it stops fighting your finger
+                    // NUCLEAR LOCK: Kill absolutely everything that makes the map move
                     reviewMap.dragging.disable(); 
+                    reviewMap.touchZoom.disable();
+                    reviewMap.doubleClickZoom.disable();
+                    reviewMap.scrollWheelZoom.disable();
+                    reviewMap.boxZoom.disable();
+                    if (reviewMap.tap) reviewMap.tap.disable();
                     
-                    // Instantly snap the car to your finger's starting position
+                    // Stop the browser from trying to scroll the page
+                    bottomPane.style.touchAction = 'none';
+                    document.body.style.overflow = 'hidden'; 
+
                     if (e.latlng) {
                         const index = findNearestReviewPoint(e.latlng.lat, e.latlng.lng);
                         updateReviewUI(index, 'map_drag');
                     }
                 }
 
-                // Turn both the car AND the entire red path into the draggable handle!
+                // Bind the touch events to the FAT line, the red line, and the car
+                window.reviewFatLine.on('mousedown touchstart', startScrubbing);
                 reviewRouteLine.on('mousedown touchstart', startScrubbing);
                 reviewCarMarker.on('mousedown touchstart', startScrubbing);
 
                 function handleMove(e) {
                     if (!isScrubbing) return;
                     if (e.cancelable) e.preventDefault(); 
+                    e.stopPropagation(); // Block Leaflet from secretly seeing the touch
                     
                     let clientX = e.clientX || (e.touches && e.touches[0].clientX);
                     let clientY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -2900,14 +2913,26 @@
                 window.addEventListener('mousemove', handleMove, { passive: false, capture: true });
                 window.addEventListener('touchmove', handleMove, { passive: false, capture: true });
 
-                function stopScrubbing() {
+                function stopScrubbing(e) {
                     if (isScrubbing) {
                         isScrubbing = false;
+                        
+                        // UNLOCK EVERYTHING
                         reviewMap.dragging.enable(); 
+                        reviewMap.touchZoom.enable();
+                        reviewMap.doubleClickZoom.enable();
+                        reviewMap.scrollWheelZoom.enable();
+                        reviewMap.boxZoom.enable();
+                        if (reviewMap.tap) reviewMap.tap.enable();
+                        
+                        bottomPane.style.touchAction = 'auto';
+                        document.body.style.overflow = 'auto';
                     }
                 }
+
                 window.addEventListener('mouseup', stopScrubbing, { capture: true });
                 window.addEventListener('touchend', stopScrubbing, { capture: true });
+                window.addEventListener('touchcancel', stopScrubbing, { capture: true });
 
                 // Build Chart
                 if (reviewAltChart) reviewAltChart.destroy();
