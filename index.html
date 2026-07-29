@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.01</title>
+    <title>StageMaster 8.02</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.01</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.02</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -850,6 +850,13 @@
         
         const reader = new FileReader();
         reader.onload = async function(e) {
+            // --- NEW: Save the raw KML for the Stage Review & clear old chart data ---
+            window.uploadedKmlText = e.target.result; 
+            if (typeof reviewRouteData !== 'undefined') {
+                reviewRouteData = []; 
+            }
+            // ------------------------------------------------------------------------
+
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
             rawWaypoints = [];
@@ -2626,8 +2633,8 @@
         // 2. Fix Leaflet's sizing bug when rendering inside a hidden div
         setTimeout(() => { reviewMap.invalidateSize(); }, 100);
 
-        // 3. Trigger the hardcoded load
-        loadHardcodedReviewKML();
+        // 3. Trigger the dynamic load
+        loadReviewKML();
     }
 
     function closeStageReview() {
@@ -2720,17 +2727,18 @@
         }
     };
 
-    // --- FETCH AND BUILD ENGINE ---
-    function loadHardcodedReviewKML() {
+    // --- DYNAMIC PARSE ENGINE ---
+    function loadReviewKML() {
         if (reviewRouteData.length > 0) return; // Prevent heavy reloading if it's already generated
-
-        const kmlUrl = "https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/refs/heads/main/home-to-gini.kml";
         
-        fetch(kmlUrl)
-            .then(response => response.text())
-            .then(kmlText => {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(kmlText, "text/xml");
+        if (!window.uploadedKmlText) {
+            console.error("No KML text found in memory.");
+            return;
+        }
+
+        try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(window.uploadedKmlText, "text/xml");
                 
                 const lineString = xmlDoc.getElementsByTagName("LineString")[0];
                 if(!lineString) return;
@@ -2884,8 +2892,10 @@
                 });
 
                 updateReviewUI(0, 'init');
-            })
-            .catch(error => console.error("Error loading KML:", error));
+                
+        } catch (error) {
+            console.error("Error parsing KML for review:", error);
+        }
     }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
