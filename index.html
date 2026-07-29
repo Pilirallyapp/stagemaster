@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.04</title>
+    <title>StageMaster 8.10</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.04</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.10</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2842,12 +2842,6 @@
                 }
                 // -----------------------------------
                 
-                // Jump to click
-                reviewRouteLine.on('click', function(e) {
-                    const index = findNearestReviewPoint(e.latlng.lat, e.latlng.lng);
-                    updateReviewUI(index, 'map_click');
-                });
-                
                 // SCRUBBING LOGIC
                 let isScrubbing = false;
                 const bottomPane = document.getElementById('review-bottom-pane');
@@ -2866,12 +2860,25 @@
                     zIndexOffset: 1000
                 }).addTo(reviewMap);
 
-                reviewCarMarker.on('mousedown touchstart', function(e) {
+                // THE FIX: Combine line tapping and car tapping into one master "Scrub Starter"
+                function startScrubbing(e) {
                     L.DomEvent.stopPropagation(e);
-                    if (e.originalEvent) e.originalEvent.preventDefault(); 
+                    if (e.originalEvent && e.originalEvent.cancelable) e.originalEvent.preventDefault();
                     isScrubbing = true;
+                    
+                    // Lock the map completely so it stops fighting your finger
                     reviewMap.dragging.disable(); 
-                });
+                    
+                    // Instantly snap the car to your finger's starting position
+                    if (e.latlng) {
+                        const index = findNearestReviewPoint(e.latlng.lat, e.latlng.lng);
+                        updateReviewUI(index, 'map_drag');
+                    }
+                }
+
+                // Turn both the car AND the entire red path into the draggable handle!
+                reviewRouteLine.on('mousedown touchstart', startScrubbing);
+                reviewCarMarker.on('mousedown touchstart', startScrubbing);
 
                 function handleMove(e) {
                     if (!isScrubbing) return;
