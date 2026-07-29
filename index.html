@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 7.55</title>
+    <title>StageMaster 8.01</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 7.55</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.01</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -294,8 +294,9 @@
             <button onclick="adjustTargetSpeed(10)" style="background: #555; color: white; width: 45px; height: 45px; border-radius: 8px; font-size: 1rem;">+10</button>
         </div>
 
+        <button id="setupReviewBtn" class="start-btn" style="background: #bf953f; color: black; height: 50px; margin-bottom: 10px;" onclick="openStageReview()">STAGE REVIEW</button>
         <button id="setupLoadBtn" class="start-btn" style="height: 50px; margin-bottom: 10px;" onclick="applyRouteSetup()">LOAD ROUTE</button>
-            <button id="setupCancelBtn" class="stop-btn" style="background: #555; height: 50px;" onclick="cancelRouteSetup()">CANCEL</button>
+        <button id="setupCancelBtn" class="stop-btn" style="background: #555; height: 50px;" onclick="cancelRouteSetup()">CANCEL</button>
         </div>
     </div>
 
@@ -309,6 +310,36 @@
                 <button id="wipeModalNoBtn" class="start-btn" style="flex: 1; height: 50px; background: #555;" onclick="confirmWipeNo()">CANCEL</button>
             </div>
         </div>
+    </div>
+
+    <!-- STAGE REVIEW CHART MODAL -->
+    <div id="stageReviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 10005; flex-direction: column;">
+        
+        <!-- Header Bar -->
+        <div style="padding: 10px 15px; background: #2d2d2d; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #bf953f;">
+            <div style="color: #bf953f; font-size: 1.2rem; font-weight: bold; text-transform: uppercase;">Stage Review</div>
+            <button onclick="closeStageReview()" style="background: #ea4335; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold;">CLOSE</button>
+        </div>
+        
+        <!-- Top Pane: Altitude Chart -->
+        <div id="review-top-pane" style="height: 50%; border-bottom: 4px solid #bf953f; padding: 10px; box-sizing: border-box; background: #2d2d2d; position: relative;">
+            <canvas id="altitudeChart" style="width: 100% !important; height: 100% !important; touch-action: none;"></canvas>
+        </div>
+
+        <!-- Bottom Pane: Map & HUD -->
+        <div id="review-bottom-pane" style="height: 50%; width: 100%; position: relative;">
+            <div id="review-hud-box" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(20, 20, 20, 0.85); border: 2px solid #bf953f; border-radius: 12px; padding: 10px 15px; color: white; font-weight: bold; display: flex; flex-direction: column; gap: 5px; pointer-events: none; box-shadow: 0px 4px 10px rgba(0,0,0,0.5);">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; font-size: 1.1rem;">
+                    <span style="color: #aaa; font-size: 0.8rem; text-transform: uppercase;">DIST</span>
+                    <span id="review-hud-dist" style="color: #fbbc05; font-family: monospace; font-size: 1.3rem;">0.00 km</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; font-size: 1.1rem;">
+                    <span style="color: #aaa; font-size: 0.8rem; text-transform: uppercase;">ALT</span>
+                    <span id="review-hud-alt" style="color: #fbbc05; font-family: monospace; font-size: 1.3rem;">0 m</span>
+                </div>
+            </div>
+        </div>
+        
     </div>
 
     <!-- REGULARITY SUMMARY MODAL -->
@@ -2567,7 +2598,297 @@
             updateWpCounters();
         }
     };
+
+    // ==========================================
+    // --- STAGE REVIEW ENGINE (HARD-CODED KML) ---
+    // ==========================================
+    
+    let reviewMap = null;
+    let reviewCarMarker = null;
+    let reviewRouteData = []; 
+    let reviewActiveIndex = 0; 
+    let reviewAltChart = null; 
+    let reviewRouteLine = null;
+
+    function openStageReview() {
+        // Open the modal
+        document.getElementById('stageReviewModal').style.display = 'flex';
+        
+        // 1. Initialize the Review Map if it hasn't been created yet
+        if (!reviewMap) {
+            reviewMap = L.map('review-bottom-pane', { zoomControl: false }).setView([38.052, 23.828], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(reviewMap);
+        }
+        
+        // 2. Fix Leaflet's sizing bug when rendering inside a hidden div
+        setTimeout(() => { reviewMap.invalidateSize(); }, 100);
+
+        // 3. Trigger the hardcoded load
+        loadHardcodedReviewKML();
+    }
+
+    function closeStageReview() {
+        document.getElementById('stageReviewModal').style.display = 'none';
+    }
+
+    // --- MATH HELPERS FOR REVIEW ROUTE ---
+    function getReviewDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; 
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    }
+
+    function getReviewBearing(lat1, lon1, lat2, lon2) {
+        const toRad = Math.PI / 180;
+        const toDeg = 180 / Math.PI;
+        const dLon = (lon2 - lon1) * toRad;
+        const y = Math.sin(dLon) * Math.cos(lat2 * toRad);
+        const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
+        return ((Math.atan2(y, x) * toDeg) + 360) % 360;
+    }
+
+    function findNearestReviewPoint(lat, lon) {
+        let minD = Infinity;
+        let closestIdx = 0;
+        for (let i = 0; i < reviewRouteData.length; i++) {
+            let d = getReviewDistance(lat, lon, reviewRouteData[i].lat, reviewRouteData[i].lon);
+            if (d < minD) { minD = d; closestIdx = i; }
+        }
+        return closestIdx;
+    }
+
+    // --- BI-DIRECTIONAL UI SYNC ---
+    function updateReviewUI(index, source) {
+        if (index === reviewActiveIndex && source !== 'init') return;
+        reviewActiveIndex = index;
+        const dataPoint = reviewRouteData[index];
+        if (!dataPoint) return;
+
+        // Update HUD
+        document.getElementById('review-hud-dist').innerText = dataPoint.dist + " km";
+        document.getElementById('review-hud-alt').innerText = dataPoint.alt + " m";
+
+        // Update Map Marker
+        if (reviewCarMarker) {
+            reviewCarMarker.setLatLng([dataPoint.lat, dataPoint.lon]);
+            const carElement = reviewCarMarker.getElement();
+            if (carElement) {
+                const img = carElement.querySelector('.car-icon-img');
+                if (img) img.style.transform = `rotate(${dataPoint.bearing}deg)`;
+            }
+        }
+
+        // Force Chart Laser Line Jump
+        if (reviewAltChart) {
+            reviewAltChart.update('none'); 
+        }
+    }
+
+    // --- CHART LASER PLUGIN ---
+    const reviewTrackerPlugin = {
+        id: 'verticalTracker',
+        afterDraw: chart => {
+            if (reviewActiveIndex >= 0 && chart.data.labels && reviewActiveIndex < chart.data.labels.length) {
+                let ctx = chart.ctx;
+                let meta = chart.getDatasetMeta(0);
+                if (!meta || !meta.data || !meta.data[reviewActiveIndex]) return;
+                
+                let x = meta.data[reviewActiveIndex].x;
+                let topY = chart.chartArea.top;
+                let bottomY = chart.chartArea.bottom;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, topY);
+                ctx.lineTo(x, bottomY);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ea4335'; 
+                ctx.stroke();
+                
+                let y = meta.data[reviewActiveIndex].y;
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ea4335';
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+    };
+
+    // --- FETCH AND BUILD ENGINE ---
+    function loadHardcodedReviewKML() {
+        if (reviewRouteData.length > 0) return; // Prevent heavy reloading if it's already generated
+
+        const kmlUrl = "https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/refs/heads/main/home-to-gini.kml";
+        
+        fetch(kmlUrl)
+            .then(response => response.text())
+            .then(kmlText => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(kmlText, "text/xml");
+                
+                const lineString = xmlDoc.getElementsByTagName("LineString")[0];
+                if(!lineString) return;
+                
+                const coordinatesText = lineString.getElementsByTagName("coordinates")[0].textContent;
+                const points = coordinatesText.trim().split(/\s+/);
+                
+                const latLngs = [];
+                const chartLabels = [];
+                const chartAltitudes = [];
+                
+                let cumulativeDistance = 0;
+                let prevLat = null;
+                let prevLon = null;
+                
+                points.forEach((point, index) => {
+                    const [lon, lat, alt] = point.split(',');
+                    if (lat && lon && alt) {
+                        const currentLat = parseFloat(lat);
+                        const currentLon = parseFloat(lon);
+                        const currentAlt = parseFloat(alt);
+
+                        if (prevLat !== null && prevLon !== null) {
+                            cumulativeDistance += getReviewDistance(prevLat, prevLon, currentLat, currentLon);
+                        }
+
+                        let bearing = 0;
+                        if (index > 0 && prevLat !== null) {
+                            bearing = getReviewBearing(prevLat, prevLon, currentLat, currentLon);
+                        }
+                        
+                        let distStr = cumulativeDistance.toFixed(2);
+                        
+                        reviewRouteData.push({
+                            lat: currentLat,
+                            lon: currentLon,
+                            alt: Math.round(currentAlt),
+                            dist: distStr,
+                            bearing: Math.round(bearing)
+                        });
+
+                        latLngs.push([currentLat, currentLon]);
+                        chartLabels.push(distStr);
+                        chartAltitudes.push(currentAlt);
+
+                        prevLat = currentLat;
+                        prevLon = currentLon;
+                    }
+                });
+
+                if (reviewRouteData.length > 1) reviewRouteData[0].bearing = reviewRouteData[1].bearing;
+
+                // Draw Red Line
+                if (reviewRouteLine) reviewMap.removeLayer(reviewRouteLine);
+                reviewRouteLine = L.polyline(latLngs, { color: '#ea4335', weight: 8, opacity: 0.8 }).addTo(reviewMap);
+                reviewMap.fitBounds(reviewRouteLine.getBounds());
+                
+                // Jump to click
+                reviewRouteLine.on('click', function(e) {
+                    const index = findNearestReviewPoint(e.latlng.lat, e.latlng.lng);
+                    updateReviewUI(index, 'map_click');
+                });
+                
+                // SCRUBBING LOGIC
+                let isScrubbing = false;
+                const bottomPane = document.getElementById('review-bottom-pane');
+
+                let carImageUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/main/4x4.png';
+                let carIcon = L.divIcon({
+                    html: `<img src="${carImageUrl}" class="car-icon-img" style="width: 40px; height: 40px; object-fit: contain; transition: transform 0.1s linear; pointer-events: none; transform: rotate(${reviewRouteData[0].bearing}deg);">`,
+                    className: 'custom-car-div',
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+                
+                if (reviewCarMarker) reviewMap.removeLayer(reviewCarMarker);
+                reviewCarMarker = L.marker([reviewRouteData[0].lat, reviewRouteData[0].lon], {
+                    icon: carIcon, 
+                    zIndexOffset: 1000
+                }).addTo(reviewMap);
+
+                reviewCarMarker.on('mousedown touchstart', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    if (e.originalEvent) e.originalEvent.preventDefault(); 
+                    isScrubbing = true;
+                    reviewMap.dragging.disable(); 
+                });
+
+                function handleMove(e) {
+                    if (!isScrubbing) return;
+                    if (e.cancelable) e.preventDefault(); 
+                    
+                    let clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                    let clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                    
+                    if (clientX && clientY) {
+                        let rect = bottomPane.getBoundingClientRect();
+                        let containerPoint = L.point(clientX - rect.left, clientY - rect.top);
+                        let latlng = reviewMap.containerPointToLatLng(containerPoint);
+                        
+                        let index = findNearestReviewPoint(latlng.lat, latlng.lng);
+                        updateReviewUI(index, 'map_drag');
+                    }
+                }
+
+                window.addEventListener('mousemove', handleMove, { passive: false, capture: true });
+                window.addEventListener('touchmove', handleMove, { passive: false, capture: true });
+
+                function stopScrubbing() {
+                    if (isScrubbing) {
+                        isScrubbing = false;
+                        reviewMap.dragging.enable(); 
+                    }
+                }
+                window.addEventListener('mouseup', stopScrubbing, { capture: true });
+                window.addEventListener('touchend', stopScrubbing, { capture: true });
+
+                // Build Chart
+                if (reviewAltChart) reviewAltChart.destroy();
+                const ctx = document.getElementById('altitudeChart').getContext('2d');
+                reviewAltChart = new Chart(ctx, {
+                    type: 'line',
+                    plugins: [reviewTrackerPlugin],
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: 'Altitude (meters)',
+                            data: chartAltitudes,
+                            borderColor: '#bf953f',
+                            backgroundColor: 'rgba(191, 149, 63, 0.2)',
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                        scales: {
+                            x: { grid: { color: '#444' }, ticks: { color: '#aaa', maxTicksLimit: 10 } },
+                            y: { grid: { color: '#444' }, ticks: { color: '#aaa' } }
+                        },
+                        onHover: (event, elements) => {
+                            if (elements && elements.length) {
+                                updateReviewUI(elements[0].index, 'chart');
+                            }
+                        }
+                    }
+                });
+
+                updateReviewUI(0, 'init');
+            })
+            .catch(error => console.error("Error loading KML:", error));
+    }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
