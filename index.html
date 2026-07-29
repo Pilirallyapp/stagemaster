@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.02</title>
+    <title>StageMaster 8.03</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.02</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.03</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2616,6 +2616,7 @@
     let reviewActiveIndex = 0; 
     let reviewAltChart = null; 
     let reviewRouteLine = null;
+    let reviewWpMarkers = []; // Memory array for the review waypoints
 
     function openStageReview() {
         // Open the modal
@@ -2795,6 +2796,51 @@
                 if (reviewRouteLine) reviewMap.removeLayer(reviewRouteLine);
                 reviewRouteLine = L.polyline(latLngs, { color: '#ea4335', weight: 8, opacity: 0.8 }).addTo(reviewMap);
                 reviewMap.fitBounds(reviewRouteLine.getBounds());
+                
+                // --- ADD WAYPOINTS TO REVIEW MAP ---
+                // 1. Clear any old markers
+                if (reviewWpMarkers && reviewWpMarkers.length > 0) {
+                    reviewWpMarkers.forEach(marker => reviewMap.removeLayer(marker));
+                }
+                reviewWpMarkers = [];
+
+                // 2. Scan KML for points and attach icons
+                const placemarks = xmlDoc.getElementsByTagName("Placemark");
+                for (let i = 0; i < placemarks.length; i++) {
+                    const point = placemarks[i].getElementsByTagName("Point")[0];
+                    if (point) {
+                        const name = placemarks[i].getElementsByTagName("name")[0]?.textContent || "";
+                        const descNode = placemarks[i].getElementsByTagName("description")[0];
+                        const description = descNode ? descNode.textContent.trim() : "";
+                        const coords = point.getElementsByTagName("coordinates")[0].textContent.trim().split(",");
+                        
+                        let iconUrl = null;
+                        let searchStr = (name + " " + description).toUpperCase();
+
+                        // Match waypoint types
+                        if (searchStr.includes("START")) iconUrl = ICONS.start;
+                        else if (searchStr.includes("FLYING") || searchStr.includes("FINISH")) iconUrl = ICONS.finish;
+                        else if (/\bRP\d*\b/.test(searchStr)) iconUrl = ICONS.rp;
+                        else if (/\bNO\s?S\d*\b/.test(searchStr)) iconUrl = ICONS.nos;
+                        else if (/\bMARSHAL\d*\b/.test(searchStr) || /\bS\d*\b/.test(searchStr)) iconUrl = ICONS.s;
+
+                        if (iconUrl) {
+                            let customIcon = L.icon({
+                                iconUrl: iconUrl,
+                                iconSize: [28, 28], // Made slightly smaller than the main map so it doesn't clutter the view
+                                iconAnchor: [14, 14]
+                            });
+                            
+                            let marker = L.marker([parseFloat(coords[1]), parseFloat(coords[0])], { 
+                                icon: customIcon, 
+                                zIndexOffset: 500 
+                            }).addTo(reviewMap);
+                            
+                            reviewWpMarkers.push(marker); // Save to memory array
+                        }
+                    }
+                }
+                // -----------------------------------
                 
                 // Jump to click
                 reviewRouteLine.on('click', function(e) {
