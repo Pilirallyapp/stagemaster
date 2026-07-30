@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.15</title>
+    <title>StageMaster 8.20</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -247,7 +247,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.15</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.20</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2625,14 +2625,11 @@
         // 1. Initialize the Review Map if it hasn't been created yet
         if (!reviewMap) {
             reviewMap = L.map('review-bottom-pane', { 
-                zoomControl: false,
-                dragging: false,
-                touchZoom: false,
-                scrollWheelZoom: false,
-                doubleClickZoom: false,
-                boxZoom: false,
-                keyboard: false,
-                tap: false 
+                zoomControl: true,
+                dragging: true,
+                touchZoom: true,
+                scrollWheelZoom: true,
+                doubleClickZoom: true
             }).setView([38.052, 23.828], 13);
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 maxZoom: 19, 
@@ -2851,25 +2848,10 @@
                 }
                 // -----------------------------------
                 
-                // SCRUBBING LOGIC (THE 1D HORIZONTAL SLIDER UPGRADE)
-                let isScrubbing = false;
-                let dragStartX = 0;
-                let dragStartIndex = 0;
-                
-                // SENSITIVITY TUNING: How many pixels you have to move your finger to advance 1 waypoint index.
-                // Lower number = faster car movement. Higher number = more precise/slower car movement.
-                const pixelsPerIndex = 4; 
-                
-                const bottomPane = document.getElementById('review-bottom-pane');
-
-                // 1. Create a FAT transparent line over the red one so mobile fingers can actually hit it!
-                if (window.reviewFatLine) reviewMap.removeLayer(window.reviewFatLine);
-                window.reviewFatLine = L.polyline(latLngs, { color: 'transparent', weight: 40, opacity: 0 }).addTo(reviewMap);
-
+                // --- CAR MARKER INIT ---
                 let carImageUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stahemaster-map-chart/main/4x4.png';
                 let carIcon = L.divIcon({
-                    // FIX: Added -webkit-touch-callout: none and user-select: none to kill the mobile long-press image popup
-                    html: `<img src="${carImageUrl}" class="car-icon-img" style="width: 40px; height: 40px; object-fit: contain; transition: transform 0.1s linear; pointer-events: none; transform: rotate(${reviewRouteData[0].bearing}deg); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;">`,
+                    html: `<img src="${carImageUrl}" class="car-icon-img" style="width: 40px; height: 40px; object-fit: contain; transition: transform 0.1s linear; pointer-events: none; transform: rotate(${reviewRouteData[0].bearing}deg);">`,
                     className: 'custom-car-div',
                     iconSize: [40, 40],
                     iconAnchor: [20, 20]
@@ -2880,66 +2862,6 @@
                     icon: carIcon, 
                     zIndexOffset: 1000
                 }).addTo(reviewMap);
-
-                function startScrubbing(e) {
-                    L.DomEvent.stopPropagation(e);
-                    if (e.originalEvent && e.originalEvent.cancelable) e.originalEvent.preventDefault();
-                    isScrubbing = true;
-                    
-                    // Capture exactly where the finger X coordinate started, and what index the car is at
-                    dragStartX = e.clientX || (e.touches && e.touches[0].clientX);
-                    dragStartIndex = reviewActiveIndex;
-                    
-                    // Stop the browser from trying to scroll the page
-                    bottomPane.style.touchAction = 'none';
-                    document.body.style.overflow = 'hidden'; 
-                }
-
-                // Bind the touch events to the FAT line, the red line, and the car
-                window.reviewFatLine.on('mousedown touchstart', startScrubbing);
-                reviewRouteLine.on('mousedown touchstart', startScrubbing);
-                reviewCarMarker.on('mousedown touchstart', startScrubbing);
-                
-                // FIX: Extra safety block to kill the system context menu from firing on long press
-                window.reviewFatLine.on('contextmenu', (e) => { L.DomEvent.stopPropagation(e); e.originalEvent.preventDefault(); });
-                reviewCarMarker.on('contextmenu', (e) => { L.DomEvent.stopPropagation(e); e.originalEvent.preventDefault(); });
-
-                function handleMove(e) {
-                    if (!isScrubbing) return;
-                    if (e.cancelable) e.preventDefault(); 
-                    e.stopPropagation(); // Block Leaflet from secretly seeing the touch
-                    
-                    let currentX = e.clientX || (e.touches && e.touches[0].clientX);
-                    
-                    if (currentX !== undefined) {
-                        // Calculate how many pixels the finger moved left or right
-                        let deltaX = currentX - dragStartX;
-                        
-                        // Convert pixels to a route index offset
-                        let indexOffset = Math.round(deltaX / pixelsPerIndex);
-                        
-                        // Calculate the new index and lock it so it doesn't crash past the start or finish line
-                        let newIndex = dragStartIndex + indexOffset;
-                        newIndex = Math.max(0, Math.min(reviewRouteData.length - 1, newIndex));
-                        
-                        updateReviewUI(newIndex, 'map_drag');
-                    }
-                }
-
-                window.addEventListener('mousemove', handleMove, { passive: false, capture: true });
-                window.addEventListener('touchmove', handleMove, { passive: false, capture: true });
-
-                function stopScrubbing(e) {
-                    if (isScrubbing) {
-                        isScrubbing = false;
-                        bottomPane.style.touchAction = 'auto';
-                        document.body.style.overflow = 'auto';
-                    }
-                }
-
-                window.addEventListener('mouseup', stopScrubbing, { capture: true });
-                window.addEventListener('touchend', stopScrubbing, { capture: true });
-                window.addEventListener('touchcancel', stopScrubbing, { capture: true });
 
                 // Build Chart
                 if (reviewAltChart) reviewAltChart.destroy();
@@ -2969,8 +2891,6 @@
                             y: { grid: { color: '#444' }, ticks: { color: '#aaa' } }
                         },
                         onHover: (event, elements) => {
-                            if (isScrubbing) return; // THE FIX: Prevent Chart from stealing focus while dragging the car!
-                            
                             if (elements && elements.length) {
                                 updateReviewUI(elements[0].index, 'chart');
                             }
