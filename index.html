@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 8.20</title>
+    <title>StageMaster 9.00</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -106,6 +106,26 @@
         .reg-table th { padding: 8px 4px; border-bottom: 2px solid #555; color: #aaa; position: sticky; top: 0; background: #2d2d2d; }
         .reg-table td { padding: 10px 4px; border-bottom: 1px solid #333; }
     </style>
+
+<!-- FIREBASE SCRIPTS -->
+<script src="https://www.gstatic.com/firebasejs/9.12.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.12.1/firebase-database-compat.js"></script>
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBs0cwlyt3rG5lkIprym-Hvi0FVfyh-Slc",
+      authDomain: "stagemaster-live.firebaseapp.com",
+      projectId: "stagemaster-live",
+      storageBucket: "stagemaster-live.firebasestorage.app",
+      messagingSenderId: "430599544857",
+      appId: "1:430599544857:web:9dd10d39bf5249bd598a88",
+      databaseURL: "https://stagemaster-live-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const myCarId = prompt("Enter your Car ID (e.g., Car1 or Car2):", "Car1");
+</script>
+
 </head>
 <body onload="checkStateRecovery()">
 
@@ -247,7 +267,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 8.20</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.00</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -568,6 +588,7 @@
    // --- MAP ENGINE SETUP ---
     let liveMap = null;
     let mapCarMarker = null;
+    let competitorMarker = null;
 
     function initMap() {
         if (liveMap) return;
@@ -575,15 +596,34 @@
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '' }).addTo(liveMap);
         
         let carIcon = L.divIcon({
-            // 1. Change width and height here to 60px
             html: `<img id="mapCarImg" src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
             className: 'custom-car-div',
-            // 2. Change the Leaflet boundary box to match [60, 60]
             iconSize: [60, 60],
-            // 3. CRITICAL: Change the anchor to exactly HALF the size [30, 30] so the GPS dot stays dead-center in the car!
             iconAnchor: [30, 30]
         });
         mapCarMarker = L.marker([38.052, 23.828], { icon: carIcon, zIndexOffset: 1000 }).addTo(liveMap);
+
+        let competitorIcon = L.divIcon({
+            html: `<img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:60px;height:60px; display: block !important; margin: auto; filter: hue-rotate(200deg) drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
+            className: 'custom-car-div',
+            iconSize: [60, 60],
+            iconAnchor: [30, 30]
+        });
+
+        database.ref('live_stage').on('value', (snapshot) => {
+            const allCars = snapshot.val();
+            if (!allCars || !liveMap) return;
+            for (const carId in allCars) {
+                if (carId !== myCarId) {
+                    const compData = allCars[carId];
+                    if (!competitorMarker) {
+                        competitorMarker = L.marker([compData.lat, compData.lon], { icon: competitorIcon, zIndexOffset: 999 }).addTo(liveMap);
+                    } else {
+                        competitorMarker.setLatLng([compData.lat, compData.lon]);
+                    }
+                }
+            }
+        });
     }
 
    function renderTulipPreview(descText) {
@@ -1488,6 +1528,18 @@
         if (compassEl) {
             compassEl.innerText = activeHeading + "° " + direction;
         }
+        
+        // --- LIVE MULTIPLAYER LOCATION PUSH ---
+        if (myCarId) {
+            database.ref('live_stage/' + myCarId).set({
+                lat: latitude,
+                lon: longitude,
+                heading: activeHeading,
+                speed: curSpeed,
+                timestamp: Date.now()
+            });
+        }
+        // --------------------------------------
         // ---------------------------------
         
         // FIRE THE DYNAMIC ARROW
