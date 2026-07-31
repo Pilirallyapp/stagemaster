@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.28</title>
+    <title>StageMaster 9.30</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -269,7 +269,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.28</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.30</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -633,14 +633,23 @@
                         }
                         continue; // Skip drawing this ghost car
                     }
+
+                    // --- 15-SECOND SPEED CACHE LOGIC ---
+                    if (!window.cachedSpeeds) window.cachedSpeeds = {};
+                    let currentSpeed = Math.round(compData.speed || 0);
                     
-                    // Build an icon dynamically so it includes the text label
+                    if (!window.cachedSpeeds[carId] || (now - window.cachedSpeeds[carId].lastUpdate > 15000)) {
+                        window.cachedSpeeds[carId] = { speed: currentSpeed, lastUpdate: now };
+                    }
+                    let displaySpeed = window.cachedSpeeds[carId].speed;
+                    
+                    // Build an icon dynamically so it includes the text label and speed
                     let dynamicCompetitorIcon = L.divIcon({
-                        html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId}</div>
+                        html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId} <span style="color:#fbbc05; font-size:12px;">${displaySpeed}km/h</span></div>
                                <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:60px;height:60px; display: block !important; margin: auto; filter: hue-rotate(200deg) drop-shadow(0px 2px 2px rgba(0,0,0,0.8)); position: relative; z-index: 1;">`,
                         className: 'custom-car-div',
-                        iconSize: [60, 80], // Made taller to fit the text label above the car
-                        iconAnchor: [30, 45] // Adjusted the anchor down so the visual car remains perfectly centered on the GPS coordinate
+                        iconSize: [90, 80], // Widened to fit the ID and Speed text cleanly
+                        iconAnchor: [45, 45] // Re-centered for the new 90px width
                     });
 
                     // Update existing marker or create a new one for each car
@@ -2732,6 +2741,15 @@
                         }
                         continue; // Skip drawing this ghost car
                     }
+
+                    // --- 15-SECOND SPEED CACHE LOGIC ---
+                    if (!window.cachedSpeeds) window.cachedSpeeds = {};
+                    let currentSpeed = Math.round(compData.speed || 0);
+                    
+                    if (!window.cachedSpeeds[carId] || (now - window.cachedSpeeds[carId].lastUpdate > 15000)) {
+                        window.cachedSpeeds[carId] = { speed: currentSpeed, lastUpdate: now };
+                    }
+                    let displaySpeed = window.cachedSpeeds[carId].speed;
                     
                     // Make your own car stand out (original color) and competitors green
                     let isMe = (carId === myCarId);
@@ -2739,11 +2757,11 @@
                     let heading = compData.heading || 0;
                     
                     let dynamicReviewIcon = L.divIcon({
-                        html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId}</div>
+                        html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId} <span style="color: #fbbc05; font-size: 12px;">${displaySpeed}km/h</span></div>
                                <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:50px;height:50px; display: block !important; margin: auto; filter: ${filterColor}; position: relative; z-index: 1; transform: rotate(${heading}deg); transition: transform 0.2s linear;">`,
                         className: 'custom-car-div',
-                        iconSize: [50, 70],
-                        iconAnchor: [25, 35]
+                        iconSize: [80, 70], // Widened to fit the ID and Speed text cleanly
+                        iconAnchor: [40, 35] // Re-centered for the new 80px width
                     });
 
                     // Update existing marker or create a new one for each car
