@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.30</title>
+    <title>StageMaster 9.40</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -269,7 +269,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.30</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.40</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -605,8 +605,15 @@
         liveMap = L.map('liveMap', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false }).setView([38.052, 23.828], 18);
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '' }).addTo(liveMap);
         
+        let myUpperId = (myCarId || "").toUpperCase();
+        let myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png';
+        if (myUpperId.includes("MIV")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
+        else if (myUpperId.includes("AMB")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
+        else if (myUpperId.includes("PLAT")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
+        else if (myUpperId.includes("FIRE")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+
         let carIcon = L.divIcon({
-            html: `<img id="mapCarImg" src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
+            html: `<img id="mapCarImg" src="${myCarImgUrl}" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
             className: 'custom-car-div',
             iconSize: [60, 60],
             iconAnchor: [30, 30]
@@ -643,10 +650,17 @@
                     }
                     let displaySpeed = window.cachedSpeeds[carId].speed;
                     
+                    let compUpperId = carId.toUpperCase();
+                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png';
+                    if (compUpperId.includes("MIV")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
+                    else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
+                    else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
+                    else if (compUpperId.includes("FIRE")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+
                     // Build an icon dynamically so it includes the text label and speed
                     let dynamicCompetitorIcon = L.divIcon({
                         html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId} <span style="color:#fbbc05; font-size:12px;">${displaySpeed}km/h</span></div>
-                               <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:60px;height:60px; display: block !important; margin: auto; filter: hue-rotate(200deg) drop-shadow(0px 2px 2px rgba(0,0,0,0.8)); position: relative; z-index: 1;">`,
+                               <img src="${compCarImgUrl}" style="width:60px;height:60px; display: block !important; margin: auto; filter: hue-rotate(200deg) drop-shadow(0px 2px 2px rgba(0,0,0,0.8)); position: relative; z-index: 1;">`,
                         className: 'custom-car-div',
                         iconSize: [90, 80], // Widened to fit the ID and Speed text cleanly
                         iconAnchor: [45, 45] // Re-centered for the new 90px width
@@ -2756,9 +2770,16 @@
                     let filterColor = isMe ? 'drop-shadow(0px 2px 2px rgba(0,0,0,0.8))' : 'hue-rotate(200deg) drop-shadow(0px 2px 2px rgba(0,0,0,0.8))';
                     let heading = compData.heading || 0;
                     
+                    let compUpperId = carId.toUpperCase();
+                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png';
+                    if (compUpperId.includes("MIV")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
+                    else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
+                    else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
+                    else if (compUpperId.includes("FIRE")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+
                     let dynamicReviewIcon = L.divIcon({
                         html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId} <span style="color: #fbbc05; font-size: 12px;">${displaySpeed}km/h</span></div>
-                               <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png" style="width:50px;height:50px; display: block !important; margin: auto; filter: ${filterColor}; position: relative; z-index: 1; transform: rotate(${heading}deg); transition: transform 0.2s linear;">`,
+                               <img src="${compCarImgUrl}" style="width:50px;height:50px; display: block !important; margin: auto; filter: ${filterColor}; position: relative; z-index: 1; transform: rotate(${heading}deg); transition: transform 0.2s linear;">`,
                         className: 'custom-car-div',
                         iconSize: [80, 70], // Widened to fit the ID and Speed text cleanly
                         iconAnchor: [40, 35] // Re-centered for the new 80px width
