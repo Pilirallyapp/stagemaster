@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.26</title>
+    <title>StageMaster 9.28</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -149,6 +149,8 @@
 <script>
     // Logic to handle the button click
     function selectLanguage(langCode) {
+        requestWakeLock(); // Secure the screen lock the exact moment they tap the app
+        
         // 1. Save the choice into the browser's memory for when the Excel file is ready
         localStorage.setItem('stagemaster_language', langCode);
         
@@ -267,7 +269,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.26</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.28</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -541,6 +543,7 @@
     }
     
     async function requestWakeLock() { 
+        if (!myCarId) return; // If Cancel was pressed on ID prompt, NEVER lock screen
         try { 
             if ('wakeLock' in navigator) { 
                 wakeLock = await navigator.wakeLock.request('screen'); 
@@ -553,6 +556,13 @@
             wakeLock.release().then(() => { wakeLock = null; }); 
         } 
     }
+
+    // Automatically re-apply the wake lock if the user minimizes and returns to the app
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') {
+            requestWakeLock();
+        }
+    });
 
     function formatWpName(name) {
         let clean = name.split('|')[0].trim();
@@ -735,6 +745,8 @@
     }
 
     function checkStateRecovery() {
+        requestWakeLock(); // Attempt to lock the screen instantly when the app loads
+        
         rBtn = document.getElementById('recToggleBtn');
         nBtn = document.getElementById('navToggleBtn');
         const vaultData = localStorage.getItem('stagemaster_vault');
