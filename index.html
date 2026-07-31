@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.25</title>
+    <title>StageMaster 9.26</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -267,7 +267,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.25</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.26</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -609,9 +609,20 @@
             const allCars = snapshot.val();
             if (!allCars || !liveMap) return;
             
+            const now = Date.now();
+            
             for (const carId in allCars) {
                 if (carId !== myCarId) {
                     const compData = allCars[carId];
+                    
+                    // --- THE SOFT FIX: 2-Minute TTL Filter ---
+                    if (now - compData.timestamp > 120000) {
+                        if (window.competitorMarkers && window.competitorMarkers[carId]) {
+                            liveMap.removeLayer(window.competitorMarkers[carId]);
+                            delete window.competitorMarkers[carId];
+                        }
+                        continue; // Skip drawing this ghost car
+                    }
                     
                     // Build an icon dynamically so it includes the text label
                     let dynamicCompetitorIcon = L.divIcon({
@@ -2696,8 +2707,19 @@
                 const allCars = snapshot.val();
                 if (!allCars || !reviewMap) return;
 
+                const now = Date.now();
+
                 for (const carId in allCars) {
                     const compData = allCars[carId];
+                    
+                    // --- THE SOFT FIX: 2-Minute TTL Filter ---
+                    if (now - compData.timestamp > 120000) {
+                        if (window.reviewLiveMarkers && window.reviewLiveMarkers[carId]) {
+                            reviewMap.removeLayer(window.reviewLiveMarkers[carId]);
+                            delete window.reviewLiveMarkers[carId];
+                        }
+                        continue; // Skip drawing this ghost car
+                    }
                     
                     // Make your own car stand out (original color) and competitors green
                     let isMe = (carId === myCarId);
@@ -2997,6 +3019,12 @@
     // ==========================================
     // Starts the millisecond the app loads, completely independent of the REC/NAV buttons.
     let bgLastCoords = null;
+    
+    // --- THE HARD FIX: Firebase Disconnect Trigger ---
+    if (myCarId) {
+        database.ref('live_stage/' + myCarId).onDisconnect().remove();
+    }
+
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition(
             (pos) => {
