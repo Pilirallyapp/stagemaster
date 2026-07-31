@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.40</title>
+    <title>StageMaster 9.41</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -269,7 +269,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.40</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.41</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -611,6 +611,8 @@
         else if (myUpperId.includes("AMB")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
         else if (myUpperId.includes("PLAT")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
         else if (myUpperId.includes("FIRE")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+        else if (myUpperId.match(/^RP\s*\d*$/) || myUpperId.includes("RADIO")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/RP.svg';
+        else if (myUpperId.match(/^S\s*\d*$/) || myUpperId.includes("MARSHAL")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
 
         let carIcon = L.divIcon({
             html: `<img id="mapCarImg" src="${myCarImgUrl}" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
@@ -656,6 +658,8 @@
                     else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
                     else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
                     else if (compUpperId.includes("FIRE")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+                    else if (compUpperId.match(/^RP\s*\d*$/) || compUpperId.includes("RADIO")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/RP.svg';
+                    else if (compUpperId.match(/^S\s*\d*$/) || compUpperId.includes("MARSHAL")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
 
                     // Build an icon dynamically so it includes the text label and speed
                     let dynamicCompetitorIcon = L.divIcon({
@@ -2776,6 +2780,8 @@
                     else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
                     else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
                     else if (compUpperId.includes("FIRE")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+                    else if (compUpperId.match(/^RP\s*\d*$/) || compUpperId.includes("RADIO")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/RP.svg';
+                    else if (compUpperId.match(/^S\s*\d*$/) || compUpperId.includes("MARSHAL")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
 
                     let dynamicReviewIcon = L.divIcon({
                         html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId} <span style="color: #fbbc05; font-size: 12px;">${displaySpeed}km/h</span></div>
