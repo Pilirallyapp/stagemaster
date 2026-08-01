@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.42</title>
+    <title>StageMaster 9.43</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -269,7 +269,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.42</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.43</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -606,7 +606,7 @@
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '' }).addTo(liveMap);
         
         let myUpperId = (myCarId || "").toUpperCase();
-        let myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png';
+        let myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Other.svg';
         if (myUpperId.includes("MIV")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
         else if (myUpperId.includes("AMB")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
         else if (myUpperId.includes("PLAT")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
@@ -653,7 +653,7 @@
                     let displaySpeed = window.cachedSpeeds[carId].speed;
                     
                     let compUpperId = carId.toUpperCase();
-                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png';
+                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Other.svg';
                     if (compUpperId.includes("MIV")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
                     else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
                     else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
@@ -661,8 +661,8 @@
                     else if (compUpperId.match(/^RP\s*\d*$/) || compUpperId.includes("RADIO")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/RP.svg';
                     else if (compUpperId.match(/^S\s*\d*$/) || compUpperId.includes("MARSHAL")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
 
-                    // Turn standard 4x4 black with a white shadow so it doesn't vanish on the map, keep SVGs original
-                    let compFilter = compCarImgUrl.includes("4x4.png") ? 'brightness(0) drop-shadow(0px 2px 2px rgba(255,255,255,0.8))' : 'drop-shadow(0px 2px 2px rgba(0,0,0,0.8))';
+                    // Remove the black filter completely since the new Other.svg has its own high-visibility colors
+                    let compFilter = 'drop-shadow(0px 2px 2px rgba(0,0,0,0.8))';
 
                     // Build an icon dynamically so it includes the text label and speed
                     let dynamicCompetitorIcon = L.divIcon({
@@ -2790,7 +2790,7 @@
                     let displaySpeed = window.cachedSpeeds[carId].speed;
                     
                     let compUpperId = carId.toUpperCase();
-                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/4x4.png';
+                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Other.svg';
                     if (compUpperId.includes("MIV")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
                     else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
                     else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
@@ -2799,9 +2799,8 @@
                     else if (compUpperId.match(/^S\s*\d*$/) || compUpperId.includes("MARSHAL")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
 
                     let isMe = (carId === myCarId);
-                    let isStandardCar = compCarImgUrl.includes("4x4.png");
-                    // Turn standard 4x4 black with a white shadow, keep true colors for SVGs and your own car
-                    let filterColor = (isMe || !isStandardCar) ? 'drop-shadow(0px 2px 2px rgba(0,0,0,0.8))' : 'brightness(0) drop-shadow(0px 2px 2px rgba(255,255,255,0.8))';
+                    // Standardize the shadow filter for all cars
+                    let filterColor = 'drop-shadow(0px 2px 2px rgba(0,0,0,0.8))';
                     let heading = compData.heading || 0;
 
                     let dynamicReviewIcon = L.divIcon({
