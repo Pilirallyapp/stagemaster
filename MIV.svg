@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 160">
+    <!-- 4 Wheels -->
+    <rect x="5" y="25" width="16" height="30" rx="5" fill="#111"/>
+    <rect x="79" y="25" width="16" height="30" rx="5" fill="#111"/>
+    <rect x="5" y="105" width="16" height="30" rx="5" fill="#111"/>
+    <rect x="79" y="105" width="16" height="30" rx="5" fill="#111"/>
+
+    <!-- Car Body -->
+    <rect x="15" y="10" width="70" height="140" rx="15" fill="#9c27b0" stroke="#7b1fa2" stroke-width="2"/>
+    
+    <!-- Windshields -->
+    <rect x="20" y="35" width="60" height="20" rx="5" fill="#222"/>
+    <rect x="20" y="105" width="60" height="15" rx="5" fill="#222"/>
+
+    <!-- Roof -->
+    <rect x="24" y="55" width="52" height="50" rx="8" fill="#fff"/>
+    
+    <!-- Roof Text -->
+    <text x="50" y="80" font-family="sans-serif" font-weight="900" font-size="22" fill="#9c27b0" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 50 80)">MIV</text>
+</svg>
