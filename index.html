@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.50</title>
+    <title>StageMaster 9.51</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -275,7 +275,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.50</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.51</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2791,10 +2791,11 @@
             else if (myUpperId.match(/^S\s*\d*$/) || myUpperId.includes("MARSHAL")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
 
             let carIcon = L.divIcon({
-                html: `<img id="mapReviewCarImg" src="${myCarImgUrl}" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
+                html: `<div id="mapReviewCarLabel" style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${myCarId} <span style="color: #fbbc05; font-size: 12px;">0km/h</span></div>
+                       <img id="mapReviewCarImg" src="${myCarImgUrl}" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8)); position: relative; z-index: 1;">`,
                 className: 'custom-car-div',
-                iconSize: [60, 60],
-                iconAnchor: [30, 30]
+                iconSize: [90, 80],
+                iconAnchor: [45, 45]
             });
             mapReviewCarMarker = L.marker([38.052, 23.828], { icon: carIcon, zIndexOffset: 1000 }).addTo(mapReviewInstance);
 
@@ -2811,6 +2812,12 @@
                         const myData = allCars[carId];
                         if (mapReviewCarMarker) {
                             mapReviewCarMarker.setLatLng([myData.lat, myData.lon]);
+                            
+                            let mySpeed = Math.round(myData.speed || 0);
+                            let labelDiv = document.getElementById('mapReviewCarLabel');
+                            if (labelDiv) {
+                                labelDiv.innerHTML = `${myCarId} <span style="color: #fbbc05; font-size: 12px;">${mySpeed}km/h</span>`;
+                            }
                         }
                         continue;
                     }
