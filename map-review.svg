@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 90" width="140" height="90">
+    <!-- Background matching the language buttons -->
+    <rect width="140" height="90" rx="8" fill="#1a1a1a" stroke="#555" stroke-width="3"/>
+    
+    <defs>
+        <!-- Defines the exact shape of the folded map to keep details inside -->
+        <clipPath id="map-shape">
+            <path d="M20 25 L53 15 L87 25 L120 15 L120 60 L87 70 L53 60 L20 70 Z"/>
+        </clipPath>
+    </defs>
+
+    <!-- Base Map Outline -->
+    <path d="M20 25 L53 15 L87 25 L120 15 L120 60 L87 70 L53 60 L20 70 Z" fill="#2d2d2d" stroke="#bf953f" stroke-width="2" stroke-linejoin="round"/>
+    
+    <!-- Clipped Map Details (Mountains, Lake, Roads) -->
+    <g clip-path="url(#map-shape)">
+        <!-- Lake -->
+        <path d="M85 20 Q105 10 125 30 T85 55 Q70 45 75 30 Z" fill="#1a73e8" opacity="0.6"/>
+        
+        <!-- Mountains -->
+        <path d="M 15 75 L 35 40 L 55 70 L 75 45 L 95 75 Z" fill="#444" stroke="#666" stroke-width="1"/>
+        <path d="M 35 40 L 41 50 L 35 53 L 29 50 Z" fill="#ccc"/>
+        <path d="M 75 45 L 80 53 L 75 56 L 70 53 Z" fill="#ccc"/>
+        
+        <!-- Winding Rally Road -->
+        <path d="M 15 55 Q 35 65 50 45 T 85 45 T 125 55" fill="none" stroke="#fbbc05" stroke-width="2.5"/>
+        
+        <!-- Map Fold Lines Overlay -->
+        <path d="M53 15 L53 60 M87 25 L87 70" stroke="#bf953f" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.5"/>
+    </g>
+    
+    <!-- Classic Red GPS Pin -->
+    <path d="M68 32 c-4 0 -7.5 3.5 -7.5 7.5 c0 5.5 7.5 14.5 7.5 14.5 c0 0 7.5 -9 7.5 -14.5 c0 -4 -3.5 -7.5 -7.5 -7.5 z" fill="#ea4335"/>
+    <circle cx="68" cy="39.5" r="2.5" fill="white"/>
+</svg>
