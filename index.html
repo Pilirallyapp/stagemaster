@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.43</title>
+    <title>StageMaster 9.50</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -133,15 +133,21 @@
 <div id="languageOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
     
     <!-- Greek Selection -->
-    <div style="margin-bottom: 40px; cursor: pointer;" onclick="selectLanguage('el')">
+    <div style="margin-bottom: 30px; cursor: pointer;" onclick="selectLanguage('el')">
         <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/gr-flag.png" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
         <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">Επιλογή γλώσσας</div>
     </div>
     
     <!-- English Selection -->
-    <div style="cursor: pointer;" onclick="selectLanguage('en')">
+    <div style="margin-bottom: 30px; cursor: pointer;" onclick="selectLanguage('en')">
         <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/eng-flag.png" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
         <div style="font-size: 1.4rem; font-weight: bold; color: white; text-transform: uppercase;">Language selection</div>
+    </div>
+
+    <!-- Map Review Selection -->
+    <div style="cursor: pointer;" onclick="openMapReviewFromLaunch()">
+        <img src="https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/map-review.svg" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #555; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
+        <div style="font-size: 1.4rem; font-weight: bold; color: #bf953f; text-transform: uppercase;">Map Review</div>
     </div>
 
 </div>
@@ -269,7 +275,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.43</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.50</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -381,6 +387,25 @@
             </div>
         </div>
     </div>
+
+<!-- MAP REVIEW FULL SCREEN MODAL -->
+<div id="mapReviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 100000; flex-direction: column; overflow: hidden;">
+    
+    <!-- Header Bar -->
+    <div style="padding: 10px 15px; background: #2d2d2d; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #bf953f; z-index: 100;">
+        <div style="color: #bf953f; font-size: 1.2rem; font-weight: bold; text-transform: uppercase;">Map Review</div>
+        <div style="display: flex; gap: 10px;">
+            <button id="locateMeBtn" onclick="toggleMapReviewTracking()" style="background: #1a73e8; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold;">LOCATE ME</button>
+            <button onclick="closeMapReview()" style="background: #ea4335; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold;">CLOSE</button>
+        </div>
+    </div>
+    
+    <!-- Map Container Wrapper (Oversized to hide spinning edges) -->
+    <div style="flex: 1; width: 100%; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <div id="fullScreenMap" style="width: 150vmax; height: 150vmax; position: absolute;"></div>
+    </div>
+    
+</div>
 
 <script>
     let globalCompassHeading = 0; // Memory for the HUD arrow
@@ -2728,6 +2753,183 @@
             updateWpCounters();
         }
     };
+
+    // ==========================================
+    // --- MAP REVIEW ENGINE ---
+    // ==========================================
+    let mapReviewInstance = null;
+    let mapReviewCarMarker = null;
+    let mapReviewTrackUpMode = false;
+    let mapReviewLocateInterval = null;
+
+    function openMapReviewFromLaunch() {
+        requestWakeLock();
+        document.getElementById('languageOverlay').style.display = 'none';
+        document.getElementById('mapReviewModal').style.display = 'flex';
+
+        if (!mapReviewInstance) {
+            mapReviewInstance = L.map('fullScreenMap', { 
+                zoomControl: true,
+                dragging: true,
+                touchZoom: true,
+                scrollWheelZoom: true,
+                doubleClickZoom: true
+            }).setView([38.052, 23.828], 15);
+            
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+                maxZoom: 19, 
+                attribution: '' 
+            }).addTo(mapReviewInstance);
+
+            let myUpperId = (myCarId || "").toUpperCase();
+            let myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Other.svg';
+            if (myUpperId.includes("MIV")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
+            else if (myUpperId.includes("AMB")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
+            else if (myUpperId.includes("PLAT")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
+            else if (myUpperId.includes("FIRE")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+            else if (myUpperId.match(/^RP\s*\d*$/) || myUpperId.includes("RADIO")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/RP.svg';
+            else if (myUpperId.match(/^S\s*\d*$/) || myUpperId.includes("MARSHAL")) myCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
+
+            let carIcon = L.divIcon({
+                html: `<img id="mapReviewCarImg" src="${myCarImgUrl}" style="width:60px;height:60px;transform: rotate(0deg); display: block !important; margin: auto; transition: transform 0.1s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));">`,
+                className: 'custom-car-div',
+                iconSize: [60, 60],
+                iconAnchor: [30, 30]
+            });
+            mapReviewCarMarker = L.marker([38.052, 23.828], { icon: carIcon, zIndexOffset: 1000 }).addTo(mapReviewInstance);
+
+            if (!window.mapReviewLiveMarkers) window.mapReviewLiveMarkers = {};
+
+            database.ref('live_stage').on('value', (snapshot) => {
+                const allCars = snapshot.val();
+                if (!allCars || !mapReviewInstance) return;
+
+                const now = Date.now();
+
+                for (const carId in allCars) {
+                    if (carId === myCarId) {
+                        const myData = allCars[carId];
+                        if (mapReviewCarMarker) {
+                            mapReviewCarMarker.setLatLng([myData.lat, myData.lon]);
+                        }
+                        continue;
+                    }
+
+                    const compData = allCars[carId];
+                    if (now - compData.timestamp > 120000) {
+                        if (window.mapReviewLiveMarkers && window.mapReviewLiveMarkers[carId]) {
+                            mapReviewInstance.removeLayer(window.mapReviewLiveMarkers[carId]);
+                            delete window.mapReviewLiveMarkers[carId];
+                        }
+                        continue;
+                    }
+
+                    if (!window.cachedSpeeds) window.cachedSpeeds = {};
+                    let currentSpeed = Math.round(compData.speed || 0);
+                    if (!window.cachedSpeeds[carId] || (now - window.cachedSpeeds[carId].lastUpdate > 15000)) {
+                        window.cachedSpeeds[carId] = { speed: currentSpeed, lastUpdate: now };
+                    }
+                    let displaySpeed = window.cachedSpeeds[carId].speed;
+                    
+                    let compUpperId = carId.toUpperCase();
+                    let compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Other.svg';
+                    if (compUpperId.includes("MIV")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/MIV.svg';
+                    else if (compUpperId.includes("AMB")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Ambulance.svg';
+                    else if (compUpperId.includes("PLAT")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Platform.svg';
+                    else if (compUpperId.includes("FIRE")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Fire%20Brigade.svg';
+                    else if (compUpperId.match(/^RP\s*\d*$/) || compUpperId.includes("RADIO")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/RP.svg';
+                    else if (compUpperId.match(/^S\s*\d*$/) || compUpperId.includes("MARSHAL")) compCarImgUrl = 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Marshal.svg';
+
+                    let filterColor = 'drop-shadow(0px 2px 2px rgba(0,0,0,0.8))';
+                    let heading = compData.heading || 0;
+
+                    let dynamicReviewIcon = L.divIcon({
+                        html: `<div style="text-align: center; font-weight: bold; font-family: monospace; font-size: 14px; color: white; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; margin-bottom: -10px; position: relative; z-index: 2;">${carId} <span style="color: #fbbc05; font-size: 12px;">${displaySpeed}km/h</span></div>
+                               <img src="${compCarImgUrl}" style="width:50px;height:50px; display: block !important; margin: auto; filter: ${filterColor}; position: relative; z-index: 1; transform: rotate(${heading}deg); transition: transform 0.2s linear;">`,
+                        className: 'custom-car-div',
+                        iconSize: [80, 70],
+                        iconAnchor: [40, 35]
+                    });
+
+                    if (!window.mapReviewLiveMarkers[carId]) {
+                        window.mapReviewLiveMarkers[carId] = L.marker([compData.lat, compData.lon], { icon: dynamicReviewIcon, zIndexOffset: 999 }).addTo(mapReviewInstance);
+                    } else {
+                        window.mapReviewLiveMarkers[carId].setLatLng([compData.lat, compData.lon]);
+                        window.mapReviewLiveMarkers[carId].setIcon(dynamicReviewIcon);
+                    }
+                    window.mapReviewLiveMarkers[carId].lastActive = compData.timestamp;
+                }
+            });
+            
+            mapReviewInstance.on('dragstart', function() {
+                if (mapReviewTrackUpMode) {
+                    toggleMapReviewTracking(); 
+                }
+            });
+        }
+        
+        if (bgLastCoords) {
+            mapReviewInstance.setView([bgLastCoords.lat, bgLastCoords.lon], 16);
+        }
+        setTimeout(() => { mapReviewInstance.invalidateSize(); }, 100);
+    }
+
+    function closeMapReview() {
+        document.getElementById('mapReviewModal').style.display = 'none';
+        document.getElementById('languageOverlay').style.display = 'flex';
+        releaseWakeLock();
+        if (mapReviewTrackUpMode) {
+            toggleMapReviewTracking(); 
+        }
+    }
+
+    function toggleMapReviewTracking() {
+        const btn = document.getElementById('locateMeBtn');
+        const mapDiv = document.getElementById('fullScreenMap');
+        
+        mapReviewTrackUpMode = !mapReviewTrackUpMode;
+
+        if (mapReviewTrackUpMode) {
+            btn.style.background = "#fbbc05";
+            btn.style.color = "black";
+            btn.innerText = "TRACK UP: ON";
+            
+            mapReviewInstance.dragging.disable();
+            if (bgLastCoords) mapReviewInstance.setView([bgLastCoords.lat, bgLastCoords.lon], 18);
+
+            mapReviewLocateInterval = setInterval(() => {
+                if (bgLastCoords && mapReviewInstance) {
+                    mapReviewInstance.setView([bgLastCoords.lat, bgLastCoords.lon], 18);
+                    
+                    let activeHeading = globalCompassHeading;
+                    mapDiv.style.transform = `rotate(${-activeHeading}deg)`;
+                    mapDiv.style.transition = 'transform 0.2s linear';
+                    
+                    let mapReviewCarImg = document.getElementById('mapReviewCarImg');
+                    if (mapReviewCarImg) {
+                        mapReviewCarImg.style.transform = `rotate(${activeHeading}deg)`;
+                    }
+                }
+            }, 1000);
+        } else {
+            btn.style.background = "#1a73e8";
+            btn.style.color = "white";
+            btn.innerText = "LOCATE ME";
+            
+            mapReviewInstance.dragging.enable();
+
+            if (mapReviewLocateInterval) {
+                clearInterval(mapReviewLocateInterval);
+                mapReviewLocateInterval = null;
+            }
+            
+            mapDiv.style.transform = 'rotate(0deg)';
+            let mapReviewCarImg = document.getElementById('mapReviewCarImg');
+            if (mapReviewCarImg) {
+                mapReviewCarImg.style.transform = `rotate(0deg)`;
+            }
+        }
+    }
 
     // ==========================================
     // --- STAGE REVIEW ENGINE (HARD-CODED KML) ---
