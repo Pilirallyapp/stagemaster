@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 9.52</title>
+    <title>StageMaster 10.00</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -275,7 +275,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 9.52</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 10.00</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -485,7 +485,7 @@
         finish: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Flying-flag.png',
         s: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Orange-marshal.png',
         rp: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/Yellow-thunder.png',
-        nos: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/blue_pin.png'
+        nos: 'https://raw.githubusercontent.com/Pilirallyapp/stagemaster/main/1000-MIGLIA.png'
     };
 
     const GR_VOICE_TRANSLATIONS = {
@@ -1017,7 +1017,7 @@
                     let wpType = "";
                     let searchStr = (name + " " + description).toUpperCase();
                     if (/\bRP\d*\b/.test(searchStr)) wpType = "RP";
-                    else if (/\bNO\s?S\d*\b/.test(searchStr)) wpType = "NOS";
+                    else if (/\bNO\s?S\d*\b/.test(searchStr) || /\b1000\s?MIGLIA\b/.test(searchStr)) wpType = "NOS";
                     else if (/\bMARSHAL\d*\b/.test(searchStr) || /\bS\d*\b/.test(searchStr)) wpType = "MARSHAL";
                     rawWaypoints.push({ name: name, desc: description, type: wpType, lon: parseFloat(coords[0]), lat: parseFloat(coords[1]) });
                 }
@@ -1239,10 +1239,11 @@
 
                 // If we found a matching icon, build it and pin it to the map
                 if (iconUrl) {
+                    let isMiglia = (wp.type === "NOS");
                     let customIcon = L.icon({
                         iconUrl: iconUrl,
-                        iconSize: [35, 35], // <-- Fixed size! Change these numbers to make them bigger/smaller
-                        iconAnchor: [17, 17] // Keeps the center of the image pinned to the exact GPS coordinate
+                        iconSize: isMiglia ? [55, 55] : [35, 35], // 55x55 for 1000 Miglia, 35x35 for others
+                        iconAnchor: isMiglia ? [27, 27] : [17, 17] // Keeps the center pinned
                     });
                     
                     // Add it to the map with a zIndex so it sits above the red line
