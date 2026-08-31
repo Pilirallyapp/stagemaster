@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 10.00</title>
+    <title>StageMaster 10.10</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -123,14 +123,27 @@
     
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
-    const myCarId = prompt("Enter your Car ID (e.g., Car1 or Car2):", "Car1");
+    let myCarId = ""; // Prompt removed! Controlled by Welcome Modal now
 </script>
 
 </head>
 <body onload="checkStateRecovery()">
 
+<!-- WELCOME / CAR ID MODAL -->
+<div id="welcomeModal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 100000; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;">
+    <div style="color: #bf953f; font-size: 1.8rem; font-weight: 900; text-transform: uppercase; margin-bottom: 20px;">STAGEMASTER INIT</div>
+    
+    <input type="text" id="welcomeCarIdInput" placeholder="Enter Name / ID (e.g., MIV 3)" style="width: 100%; max-width: 300px; padding: 15px; border-radius: 12px; border: 2px solid #555; background: #2d2d2d; color: white; font-size: 1.2rem; text-align: center; font-weight: bold; margin-bottom: 25px; outline: none;">
+    
+    <input type="file" id="welcomeKmlInput" accept=".kml,application/vnd.google-earth.kml+xml,text/xml,application/xml" style="display: none;" onchange="handleWelcomeKml(event)">
+    
+    <button class="start-btn" id="welcomeLoadBtn" style="background-color: #1a73e8; margin-bottom: 15px; max-width: 300px; height: 60px;" onclick="document.getElementById('welcomeKmlInput').click()">LOAD KML</button>
+    
+    <button class="stop-btn" id="welcomeSkipBtn" style="background-color: #555; max-width: 300px; height: 60px;" onclick="skipWelcomeKml()">SKIP FILE</button>
+</div>
+
 <!-- LANGUAGE SELECTION OVERLAY -->
-<div id="languageOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+<div id="languageOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
     
     <!-- Greek Selection -->
     <div style="margin-bottom: 30px; cursor: pointer;" onclick="selectLanguage('el')">
@@ -153,11 +166,39 @@
 </div>
 
 <script>
+    // --- WELCOME MODAL LOGIC ---
+    function finalizeWelcome(id) {
+        myCarId = id.trim();
+        if (myCarId) {
+            database.ref('live_stage/' + myCarId).onDisconnect().remove();
+        }
+        document.getElementById('welcomeModal').style.display = 'none';
+        document.getElementById('languageOverlay').style.display = 'flex';
+    }
+
+    function skipWelcomeKml() {
+        let inputVal = document.getElementById('welcomeCarIdInput').value;
+        if (!inputVal) { alert("Please enter your Name / ID first"); return; }
+        finalizeWelcome(inputVal);
+    }
+
+    function handleWelcomeKml(event) {
+        let inputVal = document.getElementById('welcomeCarIdInput').value;
+        if (!inputVal) { 
+            alert("Please enter your Name / ID first"); 
+            document.getElementById('welcomeKmlInput').value = ""; 
+            return; 
+        }
+        finalizeWelcome(inputVal);
+        switchMode('NAV'); // Pre-switch the app in the background
+        startImport(event);
+    }
+
     // Logic to handle the button click
     function selectLanguage(langCode) {
         requestWakeLock(); // Secure the screen lock the exact moment they tap the app
         
-        // 1. Save the choice into the browser's memory for when the Excel file is ready
+        // 1. Save the choice into the browser's memory
         localStorage.setItem('stagemaster_language', langCode);
         
         // 2. Hide this overlay to reveal the normal application underneath
@@ -182,25 +223,19 @@
             if (rpBtn) rpBtn.textContent = "Μερικός μηδενισμός";
             
             let expBtn = document.getElementById('exportBtn');
-                if (expBtn) expBtn.textContent = "Λήψη αρχείου KML";
+            if (expBtn) expBtn.textContent = "Λήψη αρχείου KML";
 
-                // Wipe Modal Translation
-                let wTitle = document.getElementById('wipeModalTitle');
-                if (wTitle) wTitle.textContent = "ΔΙΑΓΡΑΦΗ ΔΙΑΔΡΟΜΗΣ;";
-                let wText = document.getElementById('wipeModalText');
-                if (wText) wText.textContent = "Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τη φορτωμένη διαδρομή και τη μνήμη;";
-                let wYes = document.getElementById('wipeModalYesBtn');
-                if (wYes) wYes.textContent = "ΝΑΙ, ΔΙΑΓΡΑΦΗ";
-                let wNo = document.getElementById('wipeModalNoBtn');
-                if (wNo) wNo.textContent = "ΑΚΥΡΩΣΗ";
-            }
+            // Wipe Modal Translation
+            let wTitle = document.getElementById('wipeModalTitle');
+            if (wTitle) wTitle.textContent = "ΔΙΑΓΡΑΦΗ ΔΙΑΔΡΟΜΗΣ;";
+            let wText = document.getElementById('wipeModalText');
+            if (wText) wText.textContent = "Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τη φορτωμένη διαδρομή και τη μνήμη;";
+            let wYes = document.getElementById('wipeModalYesBtn');
+            if (wYes) wYes.textContent = "ΝΑΙ, ΔΙΑΓΡΑΦΗ";
+            let wNo = document.getElementById('wipeModalNoBtn');
+            if (wNo) wNo.textContent = "ΑΚΥΡΩΣΗ";
         }
-
-    // Optional: If you want the app to remember the choice and skip this screen on future loads, 
-    // uncomment the three lines below:
-    // if (localStorage.getItem('stagemaster_language')) {
-    //     document.getElementById('languageOverlay').style.display = 'none';
-    // }
+    }
 </script>
 
 <div class="header"><h1>STAGEMASTER <span>by</span> PILI</h1></div>
@@ -275,7 +310,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 10.00</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 10.10</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -293,7 +328,7 @@
 </div>
 
 <!-- FIX 2: Restored ROUTE SETUP MODAL -->
-<div id="entrySetupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center;">
+<div id="entrySetupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100001; justify-content: center; align-items: center;">
     <div class="modal-content" style="background: #2d2d2d; padding: 1.5rem; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 2px solid #555;">
         <div id="setupModalTitle" style="color: #bf953f; font-size: 1.4rem; font-weight: bold; margin-bottom: 20px;">ROUTE SETUP</div>
         
@@ -2870,16 +2905,60 @@
                     });
 
                     if (!window.mapReviewLiveMarkers[carId]) {
-                        window.mapReviewLiveMarkers[carId] = L.marker([compData.lat, compData.lon], { icon: dynamicReviewIcon, zIndexOffset: 999 }).addTo(mapReviewInstance);
-                    } else {
-                        window.mapReviewLiveMarkers[carId].setLatLng([compData.lat, compData.lon]);
-                        window.mapReviewLiveMarkers[carId].setIcon(dynamicReviewIcon);
-                    }
-                    window.mapReviewLiveMarkers[carId].lastActive = compData.timestamp;
+                    window.mapReviewLiveMarkers[carId] = L.marker([compData.lat, compData.lon], { icon: dynamicReviewIcon, zIndexOffset: 999 }).addTo(mapReviewInstance);
+                } else {
+                    window.mapReviewLiveMarkers[carId].setLatLng([compData.lat, compData.lon]);
+                    window.mapReviewLiveMarkers[carId].setIcon(dynamicReviewIcon);
                 }
-            });
+                window.mapReviewLiveMarkers[carId].lastActive = compData.timestamp;
+            }
+        });
+
+        // --- NEW: Draw Pre-loaded KML on Map Review ---
+        if (typeof navPathCoords !== 'undefined' && navPathCoords.length > 0) {
+            let latlngs = navPathCoords.map(pt => [pt.lat, pt.lon]);
             
-            mapReviewInstance.on('dragstart', function() {
+            // Clear old line if it exists
+            if (window.mapReviewRouteLine) {
+                mapReviewInstance.removeLayer(window.mapReviewRouteLine);
+            }
+            window.mapReviewRouteLine = L.polyline(latlngs, { color: '#ea4335', weight: 6, opacity: 0.8 }).addTo(mapReviewInstance);
+            
+            // Fit bounds so you can see ALL the path zooming in and out initially
+            mapReviewInstance.fitBounds(window.mapReviewRouteLine.getBounds());
+            
+            if (typeof navWaypoints !== 'undefined' && navWaypoints.length > 0) {
+                if (window.mapReviewWpMarkers && window.mapReviewWpMarkers.length > 0) {
+                    window.mapReviewWpMarkers.forEach(m => mapReviewInstance.removeLayer(m));
+                }
+                window.mapReviewWpMarkers = [];
+
+                navWaypoints.forEach((wp) => {
+                    let iconUrl = null;
+                    let searchStr = (wp.name + " " + (wp.desc || "")).toUpperCase();
+                    
+                    if (searchStr.includes("START")) iconUrl = ICONS.start;
+                    else if (searchStr.includes("FLYING") || searchStr.includes("FINISH")) iconUrl = ICONS.finish;
+                    else if (wp.type === "RP") iconUrl = ICONS.rp;
+                    else if (wp.type === "NOS") iconUrl = ICONS.nos;
+                    else if (wp.type === "MARSHAL") iconUrl = ICONS.s;
+
+                    if (iconUrl) {
+                        let isMiglia = (wp.type === "NOS");
+                        let customIcon = L.icon({
+                            iconUrl: iconUrl,
+                            iconSize: isMiglia ? [55, 55] : [35, 35],
+                            iconAnchor: isMiglia ? [27, 27] : [17, 17]
+                        });
+                        let marker = L.marker([wp.lat, wp.lon], { icon: customIcon, zIndexOffset: 500 }).addTo(mapReviewInstance);
+                        window.mapReviewWpMarkers.push(marker);
+                    }
+                });
+            }
+        }
+        // ----------------------------------------------
+        
+        mapReviewInstance.on('dragstart', function() {
                 if (mapReviewTrackUpMode) {
                     toggleMapReviewTracking(); 
                 }
