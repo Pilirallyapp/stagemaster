@@ -2704,10 +2704,10 @@
         window.offlineImageCache = {}; // Flush the Blob images from active RAM
         localStorage.removeItem('stagemaster_vault'); // Destroy the persistent save state
         
-        // Wait 2500 milliseconds (2.5s) to allow the voice to finish speaking before refreshing
+        // Wait 4500 milliseconds (4.5s) to allow the voice to finish speaking before refreshing
         setTimeout(() => {
             location.reload(); 
-        }, 2500); 
+        }, 4500); 
     }
 
     wipeBtn.addEventListener('touchstart', startWipeTimer);
