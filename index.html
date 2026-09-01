@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 10.10</title>
+    <title>StageMaster 10.11</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding-top: env(safe-area-inset-top, 10px); transition: background-color 0.3s; }
@@ -310,7 +310,7 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 10.10</div>
+    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 10.11</div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2695,6 +2695,12 @@
         document.getElementById('wipeConfirmModal').style.display = 'none';
         speak("Memory vault cleared from route.");
         
+        // --- NEW LOCKDOWN LOGIC ---
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        clearInterval(timerInterval);
+        saveStateToVault = function() {}; // Neutralizes the save function so it cannot recreate the vault
+        // --------------------------
+
         window.offlineImageCache = {}; // Flush the Blob images from active RAM
         localStorage.removeItem('stagemaster_vault'); // Destroy the persistent save state
         
