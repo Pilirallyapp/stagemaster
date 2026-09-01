@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>StageMaster 10.15</title>
+    <title>StageMaster 10.20</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         html { overscroll-behavior: none; }
@@ -311,7 +311,10 @@
         <div id="regularityHud" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); text-align: center; padding: 6px 0; z-index: 100; display: none; font-weight: bold; font-family: monospace; font-size: 1.15rem; border-top: 1px solid #555;"></div>
     </div>
 
-    <div style="font-size: 0.6rem; color: #666; margin-top: 10px;">version 10.15</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 15px; padding: 0 5px; box-sizing: border-box;">
+        <div style="font-size: 0.6rem; color: #666;">version 10.20</div>
+        <button id="hardRestartBtn" style="background: transparent; color: #ea4335; border: 1px solid #ea4335; border-radius: 6px; padding: 5px 12px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; position: relative; overflow: hidden; height: 30px;">Hold 3s to Restart</button>
+    </div>
 </div> <!-- This closes the main .card container! -->
 
 <!-- FIX 1: Restored STAGE SUMMARY MODAL -->
@@ -2731,6 +2734,42 @@
             document.getElementById('wipeBtn').style.display = 'block';
         }
     };
+
+// --- HARD RESTART LOGIC ---
+    const restartBtn = document.getElementById('hardRestartBtn');
+    let restartProgress = 0;
+    let restartInterval;
+
+    function startRestartTimer(e) {
+        e.preventDefault();
+        restartProgress = 0;
+        restartInterval = setInterval(() => {
+            restartProgress += 2;
+            restartBtn.style.background = `linear-gradient(to right, #ea4335 ${restartProgress}%, transparent ${restartProgress}%)`;
+            restartBtn.style.color = restartProgress > 50 ? "white" : "#ea4335";
+            
+            if (restartProgress >= 100) {
+                clearInterval(restartInterval);
+                restartBtn.style.background = "transparent";
+                restartBtn.style.color = "#ea4335";
+                if (confirm("Restart StageMaster and return to the login screen?")) {
+                    location.reload();
+                }
+            }
+        }, 60); 
+    }
+
+    function cancelRestartTimer(e) {
+        e.preventDefault();
+        clearInterval(restartInterval);
+        restartBtn.style.background = "transparent";
+        restartBtn.style.color = "#ea4335";
+        restartProgress = 0;
+    }
+
+    restartBtn.addEventListener('touchstart', startRestartTimer);
+    restartBtn.addEventListener('touchend', cancelRestartTimer);
+    restartBtn.addEventListener('touchcancel', cancelRestartTimer);
 
 // --- WAYPOINT COUNTERS LOGIC ---
     function updateWpCounters() {
